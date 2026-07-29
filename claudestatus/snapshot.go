@@ -37,7 +37,7 @@ func saveSnapshot(limits map[string]json.RawMessage) error {
 	// Пишем через временный файл рядом и переименовываем: читатель никогда
 	// не увидит половину записи и может читать без блокировок.
 	temporary := filepath.Join(dir, snapshotName+".tmp")
-	if err := os.WriteFile(temporary, append(data, '\n'), 0o644); err != nil {
+	if err := os.WriteFile(temporary, append(data, '\n'), 0o600); err != nil {
 		return err
 	}
 	return os.Rename(temporary, filepath.Join(dir, snapshotName))

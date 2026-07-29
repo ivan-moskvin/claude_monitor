@@ -20,6 +20,10 @@ const keepFrames = 3
 // запуска, и она должна продолжать работать.
 type assets struct {
 	port int
+	// Кому позволено забирать кадр. Панель показывает расход лимитов, и в
+	// чужой сети её незачем отдавать кому попало: соседний ноутбук в кафе
+	// такой же сосед по подсети, как и наш Times Gate.
+	allowIP string
 	// Пути, за которыми устройство уже приходило. Команда доставляется
 	// мгновенно, а картинка едет отдельным запросом — и только он
 	// доказывает, что кадр реально забрали.
@@ -30,8 +34,8 @@ type assets struct {
 	order  []string
 }
 
-func newAssets(port int) *assets {
-	return &assets{port: port, frames: make(map[string][]byte), fetched: make(chan string, 8)}
+func newAssets(port int, allowIP string) *assets {
+	return &assets{port: port, allowIP: allowIP, frames: make(map[string][]byte), fetched: make(chan string, 8)}
 }
 
 // awaitFetch ждёт, пока устройство заберёт кадр по этой ссылке.
@@ -68,13 +72,27 @@ func (a *assets) listen() error {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", a.serve)
 
+	// Таймауты, чтобы подвисшее соединение не держало мост: обслуживаем мы
+	// одного клиента с одним маленьким файлом.
+	server := &http.Server{
+		Handler:           mux,
+		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       10 * time.Second,
+		WriteTimeout:      15 * time.Second,
+		IdleTimeout:       30 * time.Second,
+	}
 	go func() {
-		_ = (&http.Server{Handler: mux}).Serve(socket)
+		_ = server.Serve(socket)
 	}()
 	return nil
 }
 
 func (a *assets) serve(w http.ResponseWriter, r *http.Request) {
+	if host, _, err := net.SplitHostPort(r.RemoteAddr); err != nil || (a.allowIP != "" && host != a.allowIP) {
+		http.NotFound(w, r)
+		return
+	}
+
 	a.mu.Lock()
 	data, ok := a.frames[r.URL.Path]
 	a.mu.Unlock()

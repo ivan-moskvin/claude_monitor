@@ -112,7 +112,7 @@ func run(once bool) error {
 		return fmt.Errorf("не удалось определить свой адрес в сети устройства: %w", err)
 	}
 
-	server := newAssets(cfg.Port)
+	server := newAssets(cfg.Port, cfg.IP)
 	if err := server.listen(); err != nil {
 		return err
 	}
