@@ -1,4 +1,4 @@
-# claude-divoom
+# claudestatus divoom
 
 Панель с лимитами Claude на экране [Divoom Times Gate](https://divoom.com/products/time-gate).
 
@@ -6,12 +6,13 @@
 статуса, рисует панель 128×128 и отдаёт её одному экрану устройства. Остальные четыре
 экрана не трогает.
 
+Живёт подкомандой основного CLI — отдельного бинаря нет:
+
 ```bash
-go build .                 # сборка
-./claude-divoom -login     # один раз: получить LocalToken устройства
-./claude-divoom            # мост: обновляет панель, пока запущен
-./claude-divoom -once      # отправить один кадр и выйти
-./claude-divoom -preview panel.gif   # посмотреть кадр, не трогая устройство
+claudestatus divoom --login          # один раз: получить LocalToken устройства
+claudestatus divoom                  # мост: обновляет панель, пока запущен
+claudestatus divoom --once           # отправить один кадр и выйти
+claudestatus divoom --preview p.gif  # посмотреть кадр, не трогая устройство
 ```
 
 Настройки — `~/.claude/divoom.json` (создаётся `-login`, права 600):

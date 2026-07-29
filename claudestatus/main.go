@@ -8,6 +8,8 @@ package main
 import (
 	"fmt"
 	"os"
+
+	"github.com/ivan-moskvin/claude_monitor/divoom"
 )
 
 // Версия берётся из самого бинаря (см. version): у сборки не из тега номера
@@ -22,6 +24,7 @@ const usage = `claudestatus — лимиты Claude в строке статус
   claudestatus check      проверить, вышла ли новая версия
   claudestatus update     скачать последнюю версию и заменить себя ею
   claudestatus uninstall  убрать строку статуса, кэш и сам бинарь
+  claudestatus divoom     показывать лимиты на экране Divoom Times Gate
   claudestatus version    показать версию
   claudestatus help       эта справка
 
@@ -46,6 +49,8 @@ func main() {
 		exit(update())
 	case "uninstall":
 		exit(uninstall())
+	case "divoom":
+		exit(divoom.Run(args[1:]))
 	case "version", "--version", "-v":
 		fmt.Println(version())
 	case "help", "--help", "-h":
