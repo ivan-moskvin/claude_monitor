@@ -60,6 +60,7 @@ func login() error {
 		DeviceList []struct {
 			DeviceName      string `json:"DeviceName"`
 			DevicePrivateIP string `json:"DevicePrivateIP"`
+			DeviceID        int    `json:"DeviceId"`
 			LocalToken      int    `json:"LocalToken"`
 		} `json:"DeviceList"`
 	}
@@ -76,7 +77,7 @@ func login() error {
 			continue
 		}
 		cfg, _ := loadConfig()
-		cfg.IP, cfg.LocalToken = entry.DevicePrivateIP, entry.LocalToken
+		cfg.IP, cfg.LocalToken, cfg.DeviceID = entry.DevicePrivateIP, entry.LocalToken, entry.DeviceID
 		if cfg.Port == 0 {
 			cfg.Port = 8477
 		}
@@ -85,6 +86,14 @@ func login() error {
 		}
 		path, _ := configPath()
 		fmt.Printf("Устройство %s (%s) записано в %s\n", entry.DeviceName, entry.DevicePrivateIP, path)
+
+		// Мост поднимается из строки статуса, а её ближайший вызов может быть
+		// нескоро: без этого после логина ничего не происходит и кажется, что
+		// привязка не сработала.
+		EnsureRunning()
+		if running() {
+			fmt.Printf("Панель включена на экране %d\n", cfg.LcdIndex)
+		}
 		return nil
 	}
 	return fmt.Errorf("в аккаунте нет устройств с LocalToken")

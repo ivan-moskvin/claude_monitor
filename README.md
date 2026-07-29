@@ -42,7 +42,6 @@ claudestatus uninstall
 
 ```
 claudestatus            строка статуса: JSON сессии на stdin, строка на stdout
-claudestatus install    прописать себя в ~/.claude/settings.json
 claudestatus check      проверить, вышла ли новая версия
 claudestatus update     скачать последнюю версию и заменить себя ею
 claudestatus uninstall  убрать строку статуса, кэш и сам бинарь
@@ -63,13 +62,13 @@ claudestatus version    показать версию
 Те же лимиты — на экране [Divoom Times Gate](https://divoom.com/products/time-gate).
 
 ```bash
-claudestatus divoom --login
+claudestatus divoom login
 ```
 
 Спросит почту и пароль от аккаунта Divoom, найдёт устройство в сети и запомнит
 токен в `divoom.json` каталога приложения. Дальше панель обновляется сама, пока идёт сессия.
 
-Занимает пятый экран — сменить на другой можно в `lcd_index` того же файла (`claudestatus divoom --help` покажет путь).
+Занимает пятый экран — сменить на другой можно в `lcd_index` того же файла (`claudestatus divoom help` покажет путь).
 Устройство рисует панель через загрузку кадра, поэтому при каждом обновлении
 экран моргает индикатором загрузки. Подробности протокола — в [divoom/README.md](divoom/README.md).
 
@@ -83,7 +82,7 @@ claudestatus divoom --login
 Наружу уходят два запроса, оба — не про вас:
 
 - к GitHub — узнать версию последнего релиза и скачать бинарь;
-- к облаку Divoom при `divoom --login` — почта и пароль от **вашего аккаунта
+- к облаку Divoom при `divoom login` — почта и пароль от **вашего аккаунта
   Divoom**, чтобы получить токен устройства. Так же делает их приложение.
 
 Пароль нигде не сохраняется — в `divoom.json` (права `600`) ложится

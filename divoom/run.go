@@ -9,9 +9,7 @@
 package divoom
 
 import (
-	"flag"
 	"fmt"
-	"io"
 	"os"
 	"os/signal"
 	"syscall"
@@ -36,43 +34,40 @@ const (
 const usage = `claudestatus divoom — панель лимитов на экране Divoom Times Gate.
 
 Использование:
-  claudestatus divoom            держать панель обновлённой (работает, пока запущен)
-  claudestatus divoom --login    получить LocalToken устройства через аккаунт Divoom
-  claudestatus divoom --once     отправить панель один раз и выйти
-  claudestatus divoom --preview FILE   сохранить кадр в файл, не трогая устройство
+  claudestatus divoom              держать панель обновлённой (работает, пока запущен)
+  claudestatus divoom login        привязать устройство через аккаунт Divoom
+  claudestatus divoom once         отправить панель один раз и выйти
+  claudestatus divoom preview FILE сохранить кадр в файл, не трогая устройство
 
-Настройки — divoom.json в каталоге приложения, создаёт --login.
+Настройки — divoom.json в каталоге приложения, создаёт login.
 `
 
 // Run — точка входа подкоманды. Ошибки возвращаются наверх: печатает их и
 // выбирает код возврата CLI, а не пакет.
 func Run(args []string) error {
-	flags := flag.NewFlagSet("divoom", flag.ContinueOnError)
-	flags.SetOutput(io.Discard)
-	doLogin := flags.Bool("login", false, "получить LocalToken устройства через аккаунт Divoom")
-	once := flags.Bool("once", false, "отправить панель один раз и выйти")
-	preview := flags.String("preview", "", "сохранить кадр в файл вместо отправки")
-	help := flags.Bool("help", false, "справка")
-
-	if err := flags.Parse(args); err != nil {
-		return fmt.Errorf("%w\n\n%s", err, usage)
-	}
-	if *help {
-		fmt.Print(usage)
-		return nil
+	if len(args) == 0 {
+		return run(false)
 	}
 
-	switch {
-	case *doLogin:
+	switch args[0] {
+	case "login":
 		return login()
-	case *preview != "":
+	case "once":
+		return run(true)
+	case "preview":
+		if len(args) < 2 {
+			return fmt.Errorf("укажите файл: claudestatus divoom preview panel.gif")
+		}
 		data, _, err := render(readSnapshot())
 		if err != nil {
 			return err
 		}
-		return os.WriteFile(*preview, data, 0o644)
+		return os.WriteFile(args[1], data, 0o644)
+	case "help", "--help", "-h":
+		fmt.Print(usage)
+		return nil
 	default:
-		return run(*once)
+		return fmt.Errorf("неизвестная команда: %s\n\n%s", args[0], usage)
 	}
 }
 

@@ -24,7 +24,7 @@ const usage = `claudestatus — лимиты Claude в строке статус
   claudestatus check      проверить, вышла ли новая версия
   claudestatus update     скачать последнюю версию и заменить себя ею
   claudestatus uninstall  убрать строку статуса, кэш и сам бинарь
-  claudestatus divoom     показывать лимиты на экране Divoom Times Gate
+  claudestatus divoom     панель лимитов на Divoom Times Gate (divoom help)
   claudestatus version    показать версию
   claudestatus help       эта справка
 

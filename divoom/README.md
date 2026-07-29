@@ -9,10 +9,10 @@
 Живёт подкомандой основного CLI — отдельного бинаря нет:
 
 ```bash
-claudestatus divoom --login          # один раз: получить LocalToken устройства
+claudestatus divoom login            # один раз: привязать устройство
 claudestatus divoom                  # мост: обновляет панель, пока запущен
-claudestatus divoom --once           # отправить один кадр и выйти
-claudestatus divoom --preview p.gif  # посмотреть кадр, не трогая устройство
+claudestatus divoom once             # отправить один кадр и выйти
+claudestatus divoom preview p.gif    # посмотреть кадр, не трогая устройство
 ```
 
 Настройки — `~/.claude/divoom.json` (создаётся `-login`, права 600):
