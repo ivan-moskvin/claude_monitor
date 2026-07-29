@@ -20,11 +20,44 @@ const (
 	fiveHourSeconds = 5 * 60 * 60
 )
 
+// Цвета 256-цветной палитры. Полосы расхода красятся по порогам, полоса
+// сброса всегда циан — там время, а не риск.
+const (
+	colorGreen     = 35
+	colorOrange    = 214
+	colorRed       = 167
+	colorCyan      = 38
+	colorEmptyBG   = 237
+	colorEmptyFG   = 250
+	colorDarkText  = 16
+	colorLightText = 231
+)
+
+// Шкала уровня reasoning effort: намеренно в фиолетово-розовой гамме,
+// чтобы не путалась с зелёным/оранжевым/красным полос расхода.
+var effortColors = map[string]int{
+	"low":    245,
+	"medium": 111,
+	"high":   141,
+	"xhigh":  171,
+	"max":    199,
+}
+
+// config — настройки виджета. Файла может не быть: по умолчанию строка
+// чёрно-белая, цвет включается тумблером в попапе.
+type config struct {
+	StatuslineColor bool `json:"statusline_color"`
+}
+
 type sessionInput struct {
 	RateLimits map[string]json.RawMessage `json:"rate_limits"`
 	Model      struct {
 		DisplayName string `json:"display_name"`
 	} `json:"model"`
+	// Приходит только когда модель поддерживает параметр effort.
+	Effort struct {
+		Level string `json:"level"`
+	} `json:"effort"`
 }
 
 type window struct {
@@ -53,9 +86,14 @@ func main() {
 		})
 	}
 
+	colorful := readConfig().StatuslineColor
+
 	var parts []string
 
 	if name := input.Model.DisplayName; name != "" {
+		if color, ok := effortColors[input.Effort.Level]; ok && colorful {
+			name = colorized(name, color)
+		}
 		parts = append(parts, name)
 	}
 
@@ -63,12 +101,17 @@ func main() {
 
 	if five.UsedPercentage != nil {
 		used := *five.UsedPercentage
-		parts = append(parts, fmt.Sprintf("5h %s", labeledBar(used, fmt.Sprintf("%.0f%%", used))))
+		parts = append(parts, fmt.Sprintf("5h %s", labeledBar(used, percentLabel(used), usageColor(used), colorful)))
+	}
+
+	if week := parseWindow(input.RateLimits["seven_day"]); week.UsedPercentage != nil {
+		used := *week.UsedPercentage
+		parts = append(parts, fmt.Sprintf("7d %s", labeledBar(used, percentLabel(used), usageColor(used), colorful)))
 	}
 
 	if left, ok := secondsLeft(five.ResetsAt); ok {
 		elapsed := float64(fiveHourSeconds-left) / fiveHourSeconds * 100
-		parts = append(parts, fmt.Sprintf("сброс %s", labeledBar(elapsed, countdown(left))))
+		parts = append(parts, fmt.Sprintf("сброс %s", labeledBar(elapsed, countdown(left), colorCyan, colorful)))
 	}
 
 	if len(parts) == 0 {
@@ -78,9 +121,12 @@ func main() {
 	fmt.Println(strings.Join(parts, " · "))
 }
 
-// labeledBar рисует полосу в рамке, внутри которой по центру написан label:
-// заполненная часть выводится инверсией, незаполненная — приглушённой.
-func labeledBar(percentage float64, label string) string {
+// labeledBar рисует полосу, внутри которой по центру написан label.
+//
+// В цветном режиме фон идёт на всю ширину — залитая часть цветом уровня,
+// остаток тёмно-серым, — поэтому граница полосы читается сама. В чёрно-белом
+// цвета нет вовсе, поэтому заливка показана инверсией, а края — рамкой.
+func labeledBar(percentage float64, label string, color int, colorful bool) string {
 	runes := []rune(label)
 	if len(runes) > barWidth {
 		runes = runes[:barWidth]
@@ -92,8 +138,60 @@ func labeledBar(percentage float64, label string) string {
 	filled := int(math.RoundToEven(percentage / 100 * barWidth))
 	filled = max(0, min(barWidth, filled))
 
-	body := fmt.Sprintf("\x1b[7m%s\x1b[27m\x1b[2m%s\x1b[22m", string(text[:filled]), string(text[filled:]))
-	return fmt.Sprintf("\x1b[2m▕\x1b[22m%s\x1b[2m▏\x1b[22m", body)
+	if !colorful {
+		body := fmt.Sprintf("\x1b[7m%s\x1b[27m\x1b[2m%s\x1b[22m",
+			string(text[:filled]), string(text[filled:]))
+		return fmt.Sprintf("\x1b[2m▕\x1b[22m%s\x1b[2m▏\x1b[22m", body)
+	}
+
+	textColor := colorDarkText
+	if color == colorRed {
+		textColor = colorLightText
+	}
+
+	return fmt.Sprintf("\x1b[1;48;5;%d;38;5;%dm%s\x1b[0;48;5;%d;38;5;%dm%s\x1b[0m",
+		color, textColor, string(text[:filled]),
+		colorEmptyBG, colorEmptyFG, string(text[filled:]))
+}
+
+// readConfig читает настройки виджета. Любая проблема с файлом — не повод
+// ломать строку статуса: возвращаем значения по умолчанию.
+func readConfig() config {
+	var cfg config
+
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return cfg
+	}
+
+	data, err := os.ReadFile(filepath.Join(home, ".claude", "claude-monitor.json"))
+	if err != nil {
+		return cfg
+	}
+
+	_ = json.Unmarshal(data, &cfg)
+	return cfg
+}
+
+func usageColor(percentage float64) int {
+	switch {
+	case percentage >= 85:
+		return colorRed
+	case percentage >= 60:
+		return colorOrange
+	default:
+		return colorGreen
+	}
+}
+
+func colorized(text string, color int) string {
+	return fmt.Sprintf("\x1b[1;38;5;%dm%s\x1b[0m", color, text)
+}
+
+// percentLabel держит ширину подписи фиксированной, иначе текст внутри полосы
+// прыгает при переходе 3% → 20% → 100%.
+func percentLabel(percentage float64) string {
+	return fmt.Sprintf("%3.0f%%", percentage)
 }
 
 func secondsLeft(resetsAt *float64) (int, bool) {

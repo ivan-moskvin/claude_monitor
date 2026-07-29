@@ -54,7 +54,7 @@ pub fn menu_bar_icon(progress: Option<f32>, level: Level) -> Vec<u8> {
         }
         Some(progress) if progress > 0.0 => {
             let (r, g, b) = level_color(level);
-            let alpha = if level == Level::Expired { 110 } else { 255 };
+            let alpha = if level == Level::Unknown { 110 } else { 255 };
 
             if let Some(arc) = arc(center, radius, progress.min(1.0)) {
                 pixmap.stroke_path(
@@ -80,7 +80,7 @@ fn level_color(level: Level) -> (u8, u8, u8) {
         Level::Ok => (52, 199, 89),
         Level::Warn => (255, 149, 0),
         Level::Critical => (255, 59, 48),
-        Level::Expired => (142, 142, 147),
+        Level::Unknown => (142, 142, 147),
     }
 }
 

@@ -129,10 +129,6 @@ body {
   font-size: 11px;
 }
 
-.legend li.expired {
-  opacity: 0.45;
-}
-
 .dot {
   width: 8px;
   height: 8px;
