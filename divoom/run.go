@@ -202,6 +202,12 @@ func run(once bool) error {
 	// status line starts it again once the Times Gate is back on the network.
 	lastSeen := time.Now()
 	for range time.Tick(pollInterval) {
+		if !ownsLock() {
+			// Someone else took over, or the panel was turned off: leave the
+			// screen to whoever owns it now.
+			return nil
+		}
+
 		if err := send(false); err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			if time.Since(lastSeen) > giveUpAfter {

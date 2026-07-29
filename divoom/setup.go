@@ -52,6 +52,12 @@ func off() error {
 	if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
 		return err
 	}
+	// A bridge left over from an update or a second copy notices the missing
+	// pid file only on its next tick, and until then it keeps drawing. Give it
+	// that moment and put the clock face back once more.
+	time.Sleep(pollInterval + time.Second)
+	restore()
+
 	fmt.Println(i18n.T("The panel is off, the screen got its clock face back"))
 	return nil
 }

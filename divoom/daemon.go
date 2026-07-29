@@ -87,6 +87,23 @@ func takeLock() error {
 	return os.WriteFile(path, []byte(strconv.Itoa(os.Getpid())+"\n"), 0o644)
 }
 
+// ownsLock tells whether the pid file still points at us. A bridge that was
+// replaced by a newer one, or whose file was removed by `divoom off`, has to
+// go: otherwise it keeps drawing on a screen nobody expects it to touch, and
+// stopping it is a hunt for a process nobody remembers starting.
+func ownsLock() bool {
+	path, err := lockPath()
+	if err != nil {
+		return true
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return false
+	}
+	pid, err := strconv.Atoi(strings.TrimSpace(string(data)))
+	return err == nil && pid == os.Getpid()
+}
+
 func dropLock() {
 	if path, err := lockPath(); err == nil {
 		_ = os.Remove(path)
