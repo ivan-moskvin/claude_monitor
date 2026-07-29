@@ -34,17 +34,18 @@ const (
 	colorLightText = 231
 )
 
-// Шкала уровня reasoning effort: намеренно в фиолетово-розовой гамме,
-// чтобы не путалась с зелёным/оранжевым/красным полос расхода.
+// Шкала уровня reasoning effort: фазы круга — те же символы, что и у самого
+// Claude Code. Цвет намеренно в фиолетово-розовой гамме, чтобы не путался
+// с зелёным/оранжевым/красным полос расхода.
 var effortStyles = map[string]struct {
-	label string
+	mark  string
 	color int
 }{
-	"low":    {"Low", 245},
-	"medium": {"Medium", 111},
-	"high":   {"High", 141},
-	"xhigh":  {"xHigh", 171},
-	"max":    {"Max", 199},
+	"low":    {"○", 245},
+	"medium": {"◔", 111},
+	"high":   {"◑", 141},
+	"xhigh":  {"◕", 171},
+	"max":    {"●", 199},
 }
 
 type sessionInput struct {
@@ -85,10 +86,10 @@ func main() {
 	var parts []string
 
 	if name := input.Model.DisplayName; name != "" {
-		// Уровень пишем рядом с моделью: цвет отличает уровни друг от друга,
-		// но не говорит, какой именно сейчас включён.
+		// Уровень показываем рядом с моделью: заполненность круга читается
+		// и без цвета, а места занимает один символ вместо слова.
 		if style, ok := effortStyles[input.Effort.Level]; ok {
-			name = colorized(name+" "+style.label, style.color)
+			name = colorized(name+" "+style.mark, style.color)
 		}
 		parts = append(parts, name)
 	}

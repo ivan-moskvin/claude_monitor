@@ -154,7 +154,7 @@ def main() -> None:
         for level in ("low", "medium", "high", "xhigh", "max")
     ]
     efforts.append(("модель без поддержки effort", session(five=42, week=57, left=2 * 3600 + 30 * 60)))
-    sections.append(("Уровень reasoning effort — рядом с моделью", efforts))
+    sections.append(("Уровень reasoning effort — круг рядом с моделью", efforts))
 
     edges = [
         ("окно уже сброшено — счётчика нет", session(effort="high", five=64, week=71)),
