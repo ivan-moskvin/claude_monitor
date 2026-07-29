@@ -2,6 +2,7 @@ package divoom
 
 import (
 	"fmt"
+	"net"
 	"net/http"
 	"strconv"
 	"strings"
@@ -48,13 +49,27 @@ func (a *assets) awaitFetch(url string, timeout time.Duration) bool {
 	}
 }
 
+// listen занимает порт до того, как мост начнёт слать команды: раньше ошибка
+// ListenAndServe глоталась, мост считал, что всё хорошо, а устройство не могло
+// забрать кадр — на экране висела вечная загрузка без единого намёка на причину.
 func (a *assets) listen() error {
+	socket, err := net.Listen("tcp", ":"+strconv.Itoa(a.port))
+	if err != nil {
+		// Порт занят кем-то ещё — берём любой свободный и запоминаем его,
+		// чтобы после перезапуска моста ссылка на экране осталась рабочей.
+		socket, err = net.Listen("tcp", ":0")
+		if err != nil {
+			return fmt.Errorf("не удалось открыть порт для кадров: %w", err)
+		}
+		a.port = socket.Addr().(*net.TCPAddr).Port
+		fmt.Printf("Порт занят, кадры отдаём на %d\n", a.port)
+	}
+
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", a.serve)
 
-	listener := &http.Server{Addr: ":" + strconv.Itoa(a.port), Handler: mux}
 	go func() {
-		_ = listener.ListenAndServe()
+		_ = (&http.Server{Handler: mux}).Serve(socket)
 	}()
 	return nil
 }

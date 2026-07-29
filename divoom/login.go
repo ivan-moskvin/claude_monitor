@@ -96,10 +96,12 @@ func readPassword(reader *bufio.Reader) (string, error) {
 	fmt.Print("Пароль: ")
 	defer fmt.Println()
 
-	if runtime.GOOS != "windows" {
-		if err := stty("-echo"); err == nil {
-			defer func() { _ = stty("echo") }()
-		}
+	if runtime.GOOS == "windows" {
+		fmt.Println("(в этой консоли пароль будет виден при вводе)")
+	} else if err := stty("-echo"); err == nil {
+		defer func() { _ = stty("echo") }()
+	} else {
+		fmt.Println("(не удалось скрыть ввод — пароль будет виден)")
 	}
 
 	password, err := reader.ReadString('\n')
