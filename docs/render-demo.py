@@ -19,6 +19,8 @@ import tempfile
 import time
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
+WINDOW_HTML = ROOT / "docs" / "window-demo.html"
+WINDOW_PNG = ROOT / "docs" / "window-demo.png"
 OUT_HTML = ROOT / "docs" / "statusline-demo.html"
 OUT_PNG = ROOT / "docs" / "statusline-demo.png"
 BADGE_HTML = ROOT / "docs" / "update-badge.html"
@@ -221,8 +223,44 @@ def main() -> None:
     ))
     print(BADGE_HTML)
 
+    # Окно Claude Code целиком: видно, где чат, где строка статуса, где режим.
+    WINDOW_HTML.write_text(window_page(ansi_to_html(render(binary, session(
+        model="Opus 5", effort="high", five=63, week=8, left=2 * 3600 + 41 * 60)))))
+    print(WINDOW_HTML)
+
+    screenshot(WINDOW_HTML, WINDOW_PNG, "980,290")
     screenshot(OUT_HTML, OUT_PNG, "1180,905")
     screenshot(BADGE_HTML, BADGE_PNG, "760,86")
+
+
+WINDOW_STYLE = """
+body { margin: 0; padding: 28px 30px; background: #0d1117; }
+.win { width: 900px; font: 14px/1.65 ui-monospace, SFMono-Regular, Menlo, monospace;
+       color: #c9d1d9; background: #161b22; border: 1px solid #30363d; border-radius: 10px;
+       padding: 18px 20px 14px; }
+.msg { margin-bottom: 6px; }
+.you { color: #8b949e; }
+.dot { color: #d97757; }
+.tool { color: #58a6ff; }
+.box { margin-top: 14px; border: 1px solid #30363d; border-radius: 8px; padding: 7px 11px;
+       color: #6e7681; }
+.status { margin-top: 9px; white-space: pre; }
+.mode { margin-top: 5px; color: #6e7681; }
+.tag { color: #d97757; font: 12px/1.4 ui-monospace, Menlo, monospace; padding-left: 12px; }
+"""
+
+
+def window_page(status_line: str) -> str:
+    body = f"""<div class='win'>
+<div class='msg you'>&gt; собери релиз и проверь лимиты</div>
+<div class='msg'><span class='dot'>⏺</span> Собрал бинарь под шесть платформ, тег проставлен.</div>
+<div class='msg'><span class='tool'>⎿</span> <span class='you'>release.yml · success · 7 файлов</span></div>
+<div class='box'>&gt; _</div>
+<div class='status'>{status_line}<span class='tag'>← лимиты Claude</span></div>
+<div class='mode'>⏵⏵ accept edits on <span class='tag'>← режим</span></div>
+</div>"""
+    return ("<!doctype html><meta charset='utf-8'><title>Claude Code со строкой статуса</title>"
+            f"<style>{STYLE}{WINDOW_STYLE}</style>{body}\n")
 
 
 def page(title: str, body: str) -> str:

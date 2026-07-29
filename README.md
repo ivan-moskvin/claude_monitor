@@ -2,6 +2,8 @@
 
 Лимиты Claude в строке статуса Claude Code — видно во время работы, без `/usage`.
 
+![Claude Code со строкой статуса](docs/window-demo.png)
+
 ## Установка
 
 ```bash
