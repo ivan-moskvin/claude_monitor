@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -16,14 +18,21 @@ import (
 	"time"
 )
 
-// Обновляемся тем же способом, каким ставились: go install нужного тега.
-// Клона на диске нет — версии берём у Go-прокси, он же отдаёт исходники.
+// Обновляемся тем же способом, каким ставились: качаем готовый бинарь из релиза
+// и подменяем им себя. Ни go, ни клона репозитория на машине не нужно.
 const (
-	modulePath = "github.com/ivan-moskvin/claude_monitor"
+	repository = "ivan-moskvin/claude_monitor"
 	// Первый вызов проверяет сразу — кэша ещё нет, — дальше не чаще раза в час.
 	updateCheckInterval = time.Hour
 	networkTimeout      = 20 * time.Second
-	installTimeout      = 5 * time.Minute
+	downloadTimeout     = 5 * time.Minute
+)
+
+// Адреса вынесены в переменные, чтобы проверять обновление на локальном сервере,
+// не выкладывая релиз.
+var (
+	releaseAPI   = "https://api.github.com/repos/" + repository + "/releases/latest"
+	downloadBase = "https://github.com/" + repository + "/releases/download/"
 )
 
 // updateCache лежит в кэше пользователя: это не настройка, потерять его не жаль.
@@ -32,7 +41,7 @@ type updateCache struct {
 	Latest    string `json:"latest"`
 }
 
-// check спрашивает у прокси последнюю версию модуля и запоминает её.
+// check спрашивает у GitHub последний релиз и запоминает его версию.
 // С --quiet работает молча — так её зовёт строка статуса.
 func check(quiet bool) error {
 	touchCache()
@@ -53,15 +62,14 @@ func check(quiet bool) error {
 	case newer(version(), latest):
 		fmt.Printf("Установлено %s, вышло %s — обновиться: claudestatus update\n", version(), latest)
 	case version() == devVersion:
-		fmt.Printf("Сборка не из тега, последняя версия — %s\n", latest)
+		fmt.Printf("Сборка не из релиза, последняя версия — %s\n", latest)
 	default:
 		fmt.Printf("Установлена последняя версия: %s\n", version())
 	}
 	return nil
 }
 
-// update переустанавливает утилиту последним тегом и заново прописывает строку
-// статуса — путь бинаря при этом не меняется, но настройки могут быть чужими.
+// update качает бинарь последнего релиза и заменяет им себя.
 func update() error {
 	latest, err := latestVersion()
 	if err != nil {
@@ -74,125 +82,132 @@ func update() error {
 		return nil
 	}
 
+	exe, err := selfPath()
+	if err != nil {
+		return err
+	}
+
 	if version() == devVersion {
 		fmt.Printf("==> Установка %s\n", latest)
 	} else {
 		fmt.Printf("==> Обновление %s → %s\n", version(), latest)
 	}
-	if err := goInstall(latest); err != nil {
+	if err := replaceSelf(exe, latest); err != nil {
 		return err
 	}
 
-	// В настройки пишем тот бинарь, который только что положил go install:
-	// запущенный сейчас может быть и сборкой из исходников в другом каталоге.
-	installed, err := installedPath()
-	if err != nil {
-		return err
-	}
-	if err := install(installed); err != nil {
-		return err
-	}
-
-	fmt.Printf("\nГотово: %s. Строка статуса обновится в следующей сессии Claude Code.\n", latest)
+	fmt.Printf("Готово: %s. Строка статуса обновится сама, перезапускать Claude Code не нужно.\n", latest)
 	return nil
 }
 
-// goInstall ставит нужную версию поверх текущей. Запущенный бинарь при этом
-// подменяется целиком — go пишет новый файл рядом и переименовывает.
-func goInstall(tag string) error {
-	if _, err := exec.LookPath("go"); err != nil {
-		return fmt.Errorf("не нашёлся go — поставьте его (brew install go) и повторите")
+// replaceSelf скачивает бинарь релиза рядом с текущим и подменяет его
+// переименованием: писать поверх работающего файла нельзя, а rename переживает
+// даже собственный запущенный процесс.
+func replaceSelf(exe, tag string) error {
+	asset := assetName()
+
+	sums, err := download(downloadBase + tag + "/checksums.txt")
+	if err != nil {
+		return fmt.Errorf("не удалось скачать контрольные суммы: %w", err)
+	}
+	want, ok := checksumFor(string(sums), asset)
+	if !ok {
+		return fmt.Errorf("в релизе %s нет бинаря для %s/%s", tag, runtime.GOOS, runtime.GOARCH)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), installTimeout)
-	defer cancel()
-
-	target := modulePath + "/claudestatus@" + tag
-	cmd := exec.CommandContext(ctx, "go", "install", target)
-	cmd.Stdout, cmd.Stderr = os.Stdout, os.Stderr
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("go install %s: %w", target, err)
+	binary, err := download(downloadBase + tag + "/" + asset)
+	if err != nil {
+		return fmt.Errorf("не удалось скачать %s: %w", asset, err)
 	}
+
+	got := sha256.Sum256(binary)
+	if hex.EncodeToString(got[:]) != want {
+		return fmt.Errorf("контрольная сумма %s не сошлась — файл побился или подменён", asset)
+	}
+
+	staged := exe + ".new"
+	if err := os.WriteFile(staged, binary, 0o755); err != nil {
+		return fmt.Errorf("не удалось записать %s: %w", staged, err)
+	}
+
+	previous := exe + ".old"
+	_ = os.Remove(previous)
+	if err := os.Rename(exe, previous); err != nil {
+		_ = os.Remove(staged)
+		return fmt.Errorf("не удалось убрать прежний бинарь: %w", err)
+	}
+	if err := os.Rename(staged, exe); err != nil {
+		_ = os.Rename(previous, exe)
+		return fmt.Errorf("не удалось поставить новый бинарь: %w", err)
+	}
+	// В Windows запущенный файл удалить не дадут — уберётся при следующем update.
+	_ = os.Remove(previous)
 	return nil
 }
 
-// installedPath — куда go install положил бинарь: GOBIN, а если он не задан,
-// то первый GOPATH/bin.
-func installedPath() (string, error) {
-	out, err := exec.Command("go", "env", "GOBIN", "GOPATH").Output()
-	if err != nil {
-		return "", fmt.Errorf("не удалось спросить у go, куда он ставит бинари: %w", err)
-	}
-
-	lines := strings.Split(strings.TrimRight(string(out), "\n"), "\n")
-	if len(lines) != 2 {
-		return "", fmt.Errorf("неожиданный ответ go env: %q", string(out))
-	}
-
-	dir := strings.TrimSpace(lines[0])
-	if dir == "" {
-		paths := filepath.SplitList(strings.TrimSpace(lines[1]))
-		if len(paths) == 0 || paths[0] == "" {
-			return "", fmt.Errorf("go не сказал ни GOBIN, ни GOPATH")
-		}
-		dir = filepath.Join(paths[0], "bin")
-	}
-
-	name := "claudestatus"
+// assetName — имя файла в релизе для текущей платформы.
+func assetName() string {
+	name := fmt.Sprintf("claudestatus_%s_%s", runtime.GOOS, runtime.GOARCH)
 	if runtime.GOOS == "windows" {
 		name += ".exe"
 	}
-	return filepath.Join(dir, name), nil
+	return name
 }
 
-// latestVersion спрашивает версию у Go-прокси — того же, через который утилита
-// ставится. Тег в репозитории и версия модуля здесь одно и то же.
-func latestVersion() (string, error) {
-	proxy := strings.TrimSuffix(firstProxy(), "/")
-	url := fmt.Sprintf("%s/%s/@latest", proxy, modulePath)
+// checksumFor ищет строку вида "<sha256>  <файл>" — формат sha256sum.
+func checksumFor(sums, asset string) (string, bool) {
+	for _, line := range strings.Split(sums, "\n") {
+		fields := strings.Fields(line)
+		if len(fields) == 2 && strings.TrimPrefix(fields[1], "*") == asset {
+			return fields[0], true
+		}
+	}
+	return "", false
+}
 
-	ctx, cancel := context.WithTimeout(context.Background(), networkTimeout)
+// latestVersion спрашивает у GitHub тег последнего релиза.
+func latestVersion() (string, error) {
+	body, err := fetch(releaseAPI, networkTimeout, "application/vnd.github+json")
+	if err != nil {
+		return "", fmt.Errorf("не удалось узнать последнюю версию: %w", err)
+	}
+
+	var release struct {
+		TagName string `json:"tag_name"`
+	}
+	if err := json.Unmarshal(body, &release); err != nil {
+		return "", fmt.Errorf("не удалось разобрать ответ GitHub: %w", err)
+	}
+	if release.TagName == "" {
+		return "", fmt.Errorf("у %s ещё нет релизов", repository)
+	}
+	return release.TagName, nil
+}
+
+func download(url string) ([]byte, error) {
+	return fetch(url, downloadTimeout, "application/octet-stream")
+}
+
+func fetch(url string, timeout time.Duration, accept string) ([]byte, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
 	request, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
+	request.Header.Set("Accept", accept)
+
 	response, err := http.DefaultClient.Do(request)
 	if err != nil {
-		return "", fmt.Errorf("не удалось узнать последнюю версию: %w", err)
+		return nil, err
 	}
 	defer response.Body.Close()
 
 	if response.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(io.LimitReader(response.Body, 512))
-		return "", fmt.Errorf("прокси ответил %s: %s", response.Status, strings.TrimSpace(string(body)))
+		return nil, fmt.Errorf("%s ответил %s", url, response.Status)
 	}
-
-	var info struct {
-		Version string `json:"Version"`
-	}
-	if err := json.NewDecoder(response.Body).Decode(&info); err != nil {
-		return "", fmt.Errorf("не удалось разобрать ответ прокси: %w", err)
-	}
-	if info.Version == "" {
-		return "", fmt.Errorf("прокси не знает версий %s — тег ещё не опубликован", modulePath)
-	}
-	return info.Version, nil
-}
-
-// firstProxy уважает GOPROXY: кто настроил себе зеркало, к нему и пойдёт.
-// direct и off здесь не годятся — по HTTP спрашивать некого.
-func firstProxy() string {
-	const public = "https://proxy.golang.org"
-
-	for _, entry := range strings.FieldsFunc(os.Getenv("GOPROXY"), func(r rune) bool { return r == ',' || r == '|' }) {
-		entry = strings.TrimSpace(entry)
-		if strings.HasPrefix(entry, "http://") || strings.HasPrefix(entry, "https://") {
-			return entry
-		}
-	}
-	return public
+	return io.ReadAll(response.Body)
 }
 
 // updateAvailable отвечает по кэшу — строка статуса в сеть не ходит.
@@ -232,12 +247,20 @@ func autoCheck() {
 	}
 }
 
-func cachePath() (string, error) {
+func cacheDir() (string, error) {
 	dir, err := os.UserCacheDir()
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(dir, "claudestatus", "update.json"), nil
+	return filepath.Join(dir, "claudestatus"), nil
+}
+
+func cachePath() (string, error) {
+	dir, err := cacheDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(dir, "update.json"), nil
 }
 
 func readCache() (updateCache, bool) {
@@ -284,12 +307,11 @@ func touchCache() {
 	_ = writeCache(cache)
 }
 
-// versionOverride задаётся при ручной сборке (-X main.versionOverride=v1.2.3):
-// у собранного локально бинаря версии нет, а демо и проверки её требуют.
+// versionOverride проставляется при сборке релиза (-X main.versionOverride=v1.2.3).
 var versionOverride string
 
-// version читает версию из самого бинаря: go install проставляет её сам,
-// собирать с -ldflags ради этого не нужно.
+// version читает версию из самого бинаря: у релизной сборки её проставляет CI,
+// у собранной руками её нет — такая считается устаревшей и значок не зажигает.
 func version() string {
 	if _, valid := parseVersion(versionOverride); valid {
 		return versionOverride
@@ -317,8 +339,8 @@ func (v semver) less(other semver) bool {
 	return v.patch < other.patch
 }
 
-// parseVersion читает и голый тег, и псевдоверсию Go: суффикс после дефиса
-// (-rc1, -0.20240101-abcdef) на сравнение номера не влияет.
+// parseVersion читает тег вида v1.2.3: суффикс после дефиса (-rc1) на сравнение
+// номера не влияет.
 func parseVersion(value string) (semver, bool) {
 	value = strings.TrimPrefix(strings.TrimSpace(value), "v")
 	if i := strings.IndexAny(value, "-+"); i >= 0 {
@@ -341,7 +363,7 @@ func parseVersion(value string) (semver, bool) {
 	return parsed, true
 }
 
-// newer сравнивает установленную версию с тегом. Сборка не из тега считается
+// newer сравнивает установленную версию с тегом. Сборка не из релиза считается
 // устаревшей: у неё нет номера, с которым можно сравнивать.
 func newer(current, tag string) bool {
 	latest, ok := parseVersion(tag)
