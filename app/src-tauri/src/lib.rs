@@ -117,9 +117,13 @@ fn place_under_tray<R: Runtime>(window: &tauri::WebviewWindow<R>, icon: tauri::R
     let icon_center = icon_position.x + icon_size.width as i32 / 2;
     let x = icon_center - size.width as i32 / 2;
 
-    // Верх рабочей области — нижняя граница строки меню,
-    // считать её высоту вручную не нужно.
-    let y = work_area.position.y + (POPUP_GAP * scale) as i32;
+    // Обычно верх рабочей области — нижняя граница строки меню, считать её высоту
+    // вручную не нужно. Но при автоскрытии меню рабочая область занимает весь экран,
+    // а строка меню всё равно раскрыта в момент клика по трею — тогда ориентируемся
+    // на нижний край самой иконки, иначе попап заезжает под меню.
+    let icon_bottom = icon_position.y + icon_size.height as i32;
+    let top = work_area.position.y.max(icon_bottom);
+    let y = top + (POPUP_GAP * scale) as i32;
 
     let margin = (SCREEN_MARGIN * scale) as i32;
     let left_edge = work_area.position.x + margin;
