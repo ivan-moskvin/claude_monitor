@@ -37,6 +37,7 @@ const usage = `claudestatus divoom — панель лимитов на экра
   claudestatus divoom              держать панель обновлённой (работает, пока запущен)
   claudestatus divoom login        привязать устройство через аккаунт Divoom
   claudestatus divoom once         отправить панель один раз и выйти
+  claudestatus divoom screen [N]   показать или занять экран 1–5
   claudestatus divoom preview FILE сохранить кадр в файл, не трогая устройство
 
 Настройки — divoom.json в каталоге приложения, создаёт login.
@@ -54,6 +55,8 @@ func Run(args []string) error {
 		return login()
 	case "once":
 		return run(true)
+	case "screen":
+		return screen(args[1:])
 	case "preview":
 		if len(args) < 2 {
 			return fmt.Errorf("укажите файл: claudestatus divoom preview panel.gif")
