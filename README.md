@@ -57,6 +57,12 @@ claudestatus version    показать версию
 
 ![Состояния строки статуса](docs/statusline-demo.png)
 
+## Автодополнение
+
+```bash
+claudestatus completion zsh >> ~/.zshrc    # или bash >> ~/.bashrc
+```
+
 ## Divoom Times Gate
 
 Те же лимиты — на экране [Divoom Times Gate](https://divoom.com/products/time-gate).

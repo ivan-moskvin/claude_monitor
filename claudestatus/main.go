@@ -25,6 +25,7 @@ const usage = `claudestatus — лимиты Claude в строке статус
   claudestatus update     скачать последнюю версию и заменить себя ею
   claudestatus uninstall  убрать строку статуса, кэш и сам бинарь
   claudestatus divoom     панель лимитов на Divoom Times Gate (divoom help)
+  claudestatus completion оболочка: скрипт автодополнения (zsh|bash)
   claudestatus version    показать версию
   claudestatus help       эта справка
 
@@ -51,6 +52,8 @@ func main() {
 		exit(uninstall())
 	case "divoom":
 		exit(divoom.Run(args[1:]))
+	case "completion":
+		exit(completion(args[1:]))
 	case "version", "--version", "-v":
 		fmt.Println(version())
 	case "help", "--help", "-h":
