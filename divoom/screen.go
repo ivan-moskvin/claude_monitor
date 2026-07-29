@@ -37,6 +37,10 @@ func screen(args []string) error {
 	wasRunning := running()
 	if wasRunning {
 		Stop()
+	} else {
+		// With no bridge running nobody gives the old screen its clock face
+		// back, and the last frame would stay there forever.
+		restore()
 	}
 
 	cfg.LcdIndex = number - 1

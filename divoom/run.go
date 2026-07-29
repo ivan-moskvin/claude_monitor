@@ -126,10 +126,6 @@ func run(once bool) error {
 	if err := server.listen(); err != nil {
 		return err
 	}
-	if server.port != cfg.Port {
-		cfg.Port = server.port
-		_ = cfg.save()
-	}
 
 	target := device{ip: cfg.IP, lcd: cfg.LcdIndex}
 
