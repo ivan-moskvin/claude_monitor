@@ -3,6 +3,7 @@ package divoom
 import (
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/ivan-moskvin/claude_monitor/i18n"
 )
@@ -26,6 +27,11 @@ func on() error {
 	fmt.Printf(i18n.T("Found device %s: %s\n"), name, ip)
 
 	EnsureRunning()
+	// The bridge writes its pid file a moment after the fork, so a check right
+	// away would report failure on a bridge that is in fact starting.
+	for i := 0; i < 30 && !running(); i++ {
+		time.Sleep(100 * time.Millisecond)
+	}
 	if running() {
 		fmt.Printf(i18n.T("The panel is on, screen %d\n"), cfg.LcdIndex+1)
 	}
