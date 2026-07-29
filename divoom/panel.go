@@ -186,9 +186,13 @@ func render(state snapshot) ([]byte, string, error) {
 
 	// Данные растут только в активной сессии Claude Code: если снапшот давно
 	// не обновлялся, проценты ниже описывают прошлое, и это должно быть видно.
+	// Кегль мельче заголовка: иначе метка встаёт к нему вплотную и читается
+	// как продолжение слова — «CLAUDE2М».
 	if state.stale {
+		const ageScale = 1
 		label := ageLabel(state.age)
-		p.drawText(label, panelSize-labelX-textWidth(label, 2), headerY+(sparkSize-glyphHeight*2)/2, 2, idxGrey)
+		p.drawText(label, panelSize-labelX-textWidth(label, ageScale),
+			headerY+(sparkSize-glyphHeight*ageScale)/2, ageScale, idxGrey)
 	}
 
 	if state.err != "" {
