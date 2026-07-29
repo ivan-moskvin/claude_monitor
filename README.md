@@ -61,6 +61,8 @@ claudestatus completion zsh >> ~/.zshrc    # или bash >> ~/.bashrc
 
 Те же лимиты — на экране [Divoom Times Gate](https://divoom.com/products/time-gate).
 
+![Панель лимитов на Divoom Times Gate](divoom.png)
+
 ```bash
 claudestatus divoom login
 ```
