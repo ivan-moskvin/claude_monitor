@@ -97,31 +97,41 @@ const POPUP_GAP: f64 = 6.0;
 /// Минимальный отступ от края экрана — иначе окно упирается в угол.
 const SCREEN_MARGIN: f64 = 8.0;
 
-/// Отодвигает попап от строки меню и не даёт ему уехать за край экрана:
-/// у иконки трея справа окно иначе вылезает за границу.
-fn offset_below_menu_bar<R: Runtime>(window: &tauri::WebviewWindow<R>) {
-    let (Ok(Some(monitor)), Ok(mut position), Ok(size)) = (
-        window.current_monitor(),
-        window.outer_position(),
-        window.outer_size(),
-    ) else {
+/// Ставит попап по центру под иконкой трея, не задевая строку меню
+/// и не вылезая за край экрана.
+///
+/// Координаты иконки берём прямо из события клика: плагины позиционирования
+/// полагаются на запомненную позицию трея и без неё роняют окно в центр экрана.
+fn place_under_tray<R: Runtime>(window: &tauri::WebviewWindow<R>, icon: tauri::Rect) {
+    let (Ok(Some(monitor)), Ok(size)) = (window.current_monitor(), window.outer_size()) else {
         return;
     };
 
     let scale = monitor.scale_factor();
-    let screen = monitor.position();
-    let screen_size = monitor.size();
+    let work_area = monitor.work_area();
 
-    position.y += (POPUP_GAP * scale) as i32;
+    // Rect приходит в логических или физических единицах — приводим к пикселям.
+    let icon_position = icon.position.to_physical::<i32>(scale);
+    let icon_size = icon.size.to_physical::<u32>(scale);
+
+    let icon_center = icon_position.x + icon_size.width as i32 / 2;
+    let x = icon_center - size.width as i32 / 2;
+
+    // Верх рабочей области — нижняя граница строки меню,
+    // считать её высоту вручную не нужно.
+    let y = work_area.position.y + (POPUP_GAP * scale) as i32;
 
     let margin = (SCREEN_MARGIN * scale) as i32;
-    let right_edge = screen.x + screen_size.width as i32 - size.width as i32 - margin;
-    position.x = position.x.clamp(screen.x + margin, right_edge.max(screen.x + margin));
+    let left_edge = work_area.position.x + margin;
+    let right_edge = work_area.position.x + work_area.size.width as i32 - size.width as i32 - margin;
 
-    let _ = window.set_position(position);
+    let _ = window.set_position(tauri::PhysicalPosition::new(
+        x.clamp(left_edge, right_edge.max(left_edge)),
+        y,
+    ));
 }
 
-fn toggle_popup<R: Runtime>(app: &tauri::AppHandle<R>) {
+fn toggle_popup<R: Runtime>(app: &tauri::AppHandle<R>, icon: tauri::Rect) {
     let Some(window) = app.get_webview_window(POPUP_LABEL) else {
         return;
     };
@@ -131,22 +141,18 @@ fn toggle_popup<R: Runtime>(app: &tauri::AppHandle<R>) {
         return;
     }
 
-    // Позиционируем под иконкой трея — окно без декораций само этого не умеет.
-    // Именно BottomCenter: TrayCenter центрирует окно по иконке и заезжает
-    // под строку меню.
-    let _ = tauri_plugin_positioner::WindowExt::move_window(
-        &window,
-        tauri_plugin_positioner::Position::TrayBottomCenter,
-    );
-    offset_below_menu_bar(&window);
+    place_under_tray(&window, icon);
     let _ = window.show();
     let _ = window.set_focus();
+
+    // Открытие попапа — сам по себе запрос свежих данных: ждать
+    // очередного тика таймера пользователь не должен.
+    refresh_tray(app);
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
-        .plugin(tauri_plugin_positioner::init())
         .plugin(tauri_plugin_autostart::init(
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
             None,
@@ -173,15 +179,14 @@ pub fn run() {
                 ))
                 .icon_as_template(false)
                 .on_tray_icon_event(|tray, event| {
-                    tauri_plugin_positioner::on_tray_event(tray.app_handle(), &event);
-
                     if let TrayIconEvent::Click {
                         button: MouseButton::Left,
                         button_state: MouseButtonState::Up,
+                        rect,
                         ..
                     } = event
                     {
-                        toggle_popup(tray.app_handle());
+                        toggle_popup(tray.app_handle(), rect);
                     }
                 })
                 .build(app)?;

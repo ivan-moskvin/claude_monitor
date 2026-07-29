@@ -9,7 +9,7 @@ use std::path::PathBuf;
 /// Окна, которые умеет показывать виджет. Добавление нового начинается здесь.
 const KNOWN_WINDOWS: &[(&str, &str)] = &[
     ("five_hour", "Сессия · 5 часов"),
-    ("seven_day", "Неделя · 7 дней"),
+    ("seven_day", "Неделя"),
     ("seven_day_opus", "Неделя · Opus"),
 ];
 

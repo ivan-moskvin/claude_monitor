@@ -176,6 +176,10 @@ body {
   font-size: 12px;
 }
 
+footer.row {
+  justify-content: flex-end;
+}
+
 .toggle input {
   accent-color: var(--ok);
 }
