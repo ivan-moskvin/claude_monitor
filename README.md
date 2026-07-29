@@ -19,18 +19,13 @@ irm https://raw.githubusercontent.com/ivan-moskvin/claude_monitor/main/install.p
 в PATH) и прописывает строку статуса в `~/.claude/settings.json` — прежние настройки
 сохраняются рядом, в `settings.json.bak`. Другой каталог — `CLAUDESTATUS_BIN_DIR`.
 
-Ничего доустанавливать не нужно: ни Go, ни компилятора. Строка статуса появится
-в следующей сессии Claude Code.
-
 ## Обновление
 
 ```bash
 claudestatus update
 ```
 
-Утилита качает бинарь нового релиза и заменяет себя им; перезапускать Claude Code
-не нужно. Проверяет она и сама — при первом за час вызове строки статуса, в фоне.
-Вышла новая версия — в конце строки загорается её номер:
+Новая версия подсвечивается в конце строки:
 
 ![Строка статуса, когда вышла новая версия](docs/update-badge.png)
 
@@ -42,7 +37,7 @@ claudestatus update
 claudestatus uninstall
 ```
 
-Убирает строку статуса из настроек, кэш проверок и сам бинарь.
+Убирает строку статуса из настроек, кэш, панель на Divoom и сам бинарь.
 
 ## Команды
 
@@ -52,6 +47,7 @@ claudestatus install    прописать себя в ~/.claude/settings.json
 claudestatus check      проверить, вышла ли новая версия
 claudestatus update     скачать последнюю версию и заменить себя ею
 claudestatus uninstall  убрать строку статуса, кэш и сам бинарь
+claudestatus divoom     показывать лимиты на экране Divoom Times Gate
 claudestatus version    показать версию
 ```
 
@@ -62,6 +58,21 @@ claudestatus version    показать версию
 по расходу: зелёный до 60%, оранжевый до 85%, дальше красный.
 
 ![Состояния строки статуса](docs/statusline-demo.png)
+
+## Divoom Times Gate
+
+Те же лимиты — на экране [Divoom Times Gate](https://divoom.com/products/time-gate).
+
+```bash
+claudestatus divoom --login
+```
+
+Спросит почту и пароль от аккаунта Divoom, найдёт устройство в сети и запомнит
+токен в `~/.claude/divoom.json`. Дальше панель обновляется сама, пока идёт сессия.
+
+Занимает пятый экран — сменить на другой можно в `lcd_index` того же файла.
+Устройство рисует панель через загрузку кадра, поэтому при каждом обновлении
+экран моргает индикатором загрузки. Подробности протокола — в [divoom/README.md](divoom/README.md).
 
 ## Как это работает
 
