@@ -24,7 +24,6 @@ const ui = {
   statuslineLabel: document.getElementById("statusline-label"),
   statuslineAction: document.getElementById("statusline-action"),
   statuslineHint: document.getElementById("statusline-hint"),
-  refresh: document.getElementById("refresh"),
   quit: document.getElementById("quit"),
 };
 
@@ -219,7 +218,6 @@ ui.autostart.addEventListener("change", async () => {
   }
 });
 
-ui.refresh.addEventListener("click", async () => apply(await invoke("snapshot")));
 ui.quit.addEventListener("click", () => invoke("quit"));
 
 document.addEventListener("keydown", (event) => {
@@ -227,6 +225,12 @@ document.addEventListener("keydown", (event) => {
 });
 
 listen("snapshot", (event) => apply(event.payload));
+
+// Попап открылся — перечитываем настройки: разовые подсказки вроде
+// «Готово, откройте новую сессию» не должны висеть до перезапуска.
+getCurrentWindow().onFocusChanged(({ payload: focused }) => {
+  if (focused) refreshStatusline();
+});
 
 // Обратный отсчёт идёт секундами, снапшот перечитывается раз в 15 секунд.
 setInterval(render, 1000);
