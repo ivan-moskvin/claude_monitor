@@ -8,18 +8,17 @@ import (
 	"github.com/ivan-moskvin/claude_monitor/paths"
 )
 
-// Настройки лежат рядом со снапшотом, в каталоге Claude Code.
 const configName = "divoom.json"
 
 // Порт локального сервера с кадрами по умолчанию.
 const defaultPort = 8477
 
 type config struct {
-	// IP устройства. Пустой — ищем через облачный каталог при каждом запуске.
+	// IP устройства. Пустой — ищем в сети заново.
 	IP string `json:"ip"`
 	// Экран 0–4, на который отдаём панель. Остальные не трогаем.
 	LcdIndex int `json:"lcd_index"`
-	// Порт локального сервера с кадрами; фиксированный, см. assets.
+	// Порт локального сервера с кадрами; занят — берётся свободный.
 	Port int `json:"port"`
 	// Идентификатор устройства в облаке Divoom — по нему узнаётся раскладка экранов.
 	DeviceID int `json:"device_id,omitempty"`

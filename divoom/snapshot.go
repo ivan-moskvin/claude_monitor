@@ -14,7 +14,6 @@ import (
 // только во время сессии.
 const staleAfter = 90 * time.Second
 
-// Имя общего с writer'ом файла лимитов.
 const snapshotName = "usage-snapshot.json"
 
 type snapshot struct {
@@ -97,9 +96,8 @@ func (s snapshot) window(id string) usageWindow {
 	return s.windows[id]
 }
 
-// usageKey — то, ради чего панель вообще существует: сами проценты. Кадр
-// меняется и от обратного отсчёта, но его сдвиг на минуту подождёт, а
-// выросший расход нужно показать сразу.
+// usageKey — только проценты, без обратного отсчёта: их рост показываем сразу,
+// а сдвиг минуты подождёт (см. minSendInterval).
 func (s snapshot) usageKey() string {
 	if s.err != "" {
 		return "err:" + s.err

@@ -54,8 +54,7 @@ const (
 	glyphHeight = 7
 )
 
-// textWidth — ширина строки в пикселях при заданном масштабе, с пробелом в
-// один пиксель между глифами.
+// textWidth — ширина строки в пикселях: между глифами один пиксель.
 func textWidth(text string, scale int) int {
 	runes := []rune(text)
 	if len(runes) == 0 {
@@ -64,7 +63,6 @@ func textWidth(text string, scale int) int {
 	return len(runes)*(glyphWidth*scale+scale) - scale
 }
 
-// drawText рисует строку от левого верхнего угла (x, y) цветом idx.
 func (p *panel) drawText(text string, x, y, scale int, idx uint8) {
 	p.drawTextSplit(text, x, y, scale, panelSize, idx, idx)
 }
@@ -96,7 +94,6 @@ func (p *panel) drawTextSplit(text string, x, y, scale, splitX int, left, right 
 	}
 }
 
-// drawTextCentered центрирует строку по горизонтали относительно всей панели.
 func (p *panel) drawTextCentered(text string, y, scale int, idx uint8) {
 	p.drawText(text, (panelSize-textWidth(text, scale))/2, y, scale, idx)
 }

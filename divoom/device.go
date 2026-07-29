@@ -10,7 +10,7 @@ import (
 )
 
 // Облачный каталог: по публичному адресу отдаёт устройства из той же сети.
-// Единственный запрос наружу и только при поиске IP — дальше всё локально.
+// Авторизации не требует.
 const lanDirectory = "https://app.divoom-gz.com/Device/ReturnSameLANDevice"
 
 type device struct {
