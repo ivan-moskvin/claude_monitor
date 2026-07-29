@@ -9,6 +9,7 @@
 
 import html
 import json
+import os
 import pathlib
 import re
 import shutil
@@ -101,18 +102,35 @@ def ansi_to_html(line: str) -> str:
     return "".join(chunks)
 
 
-def build_writer() -> pathlib.Path:
-    binary = pathlib.Path(tempfile.mkdtemp()) / "claude-statusline"
+def build_writer(pending_tag: str | None = None) -> pathlib.Path:
+    """Собирает бинарь в поддельном клоне: строке статуса хватает .git рядом.
+
+    С pending_tag рядом кладётся готовый кэш проверки — так рисуется состояние
+    «вышло обновление», без единого запроса в сеть.
+    """
+    root = pathlib.Path(tempfile.mkdtemp())
+    (root / ".git").mkdir()
+    (root / "bin").mkdir()
+
+    binary = root / "bin" / "claudestatus"
     subprocess.run(
-        ["go", "build", "-o", str(binary), "."],
-        cwd=ROOT / "statusline", check=True,
+        ["go", "build", "-ldflags", "-X main.version=v1.0.0", "-o", str(binary), "."],
+        cwd=ROOT / "claudestatus", check=True,
     )
+
+    if pending_tag:
+        (root / "bin" / "update-check.json").write_text(
+            json.dumps({"checked_at": int(time.time()), "latest": pending_tag})
+        )
+
     return binary
 
 
 def render(binary: pathlib.Path, payload: dict) -> str:
     result = subprocess.run(
         [str(binary)], input=json.dumps(payload), capture_output=True, text=True,
+        # Фоновая проверка на каждый рендер ни к чему: теги здесь и так заданы.
+        env={**os.environ, "CLAUDESTATUS_NO_AUTO_UPDATE": "1"},
     )
     return result.stdout.rstrip("\n")
 
@@ -163,11 +181,16 @@ def main() -> None:
     ]
     sections.append(("Крайние случаи", edges))
 
+    pending = build_writer(pending_tag="v1.0.1")
+    sections.append(("Вышел новый тег — обновиться командой claudestatus update", [
+        ("установлено v1.0.0", session(effort="high", five=42, week=57, left=2 * 3600 + 30 * 60), pending),
+    ]))
+
     blocks = []
     for title, rows in sections:
         items = []
-        for note, payload in rows:
-            line = ansi_to_html(render(binary, payload))
+        for note, payload, *writer in rows:
+            line = ansi_to_html(render(writer[0] if writer else binary, payload))
             items.append(f'<tr><td class="line">{line}</td><td class="note">{html.escape(note)}</td></tr>')
         blocks.append(f'<h2>{html.escape(title)}</h2><table>{"".join(items)}</table>')
 
@@ -187,7 +210,7 @@ def main() -> None:
         shot = pathlib.Path(tempfile.mkdtemp())
         subprocess.run(
             [CHROME, "--headless", "--disable-gpu", "--hide-scrollbars",
-             "--window-size=1180,830", f"--screenshot={OUT_PNG}", OUT_HTML.as_uri()],
+             "--window-size=1180,905", f"--screenshot={OUT_PNG}", OUT_HTML.as_uri()],
             capture_output=True, check=True, cwd=shot,
         )
         shutil.rmtree(shot, ignore_errors=True)
