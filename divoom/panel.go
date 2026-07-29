@@ -29,15 +29,19 @@ const (
 	idxClaude
 )
 
+// Цвета — те же, что в строке статуса, из 256-цветной палитры терминала:
+// 35 зелёный, 214 оранжевый, 167 красный, 38 циан, 237 фон пустой части,
+// 250 текст на ней. Панель и строка статуса показывают одно и то же, и
+// расходиться в цвете им незачем.
 var palette = color.Palette{
 	color.RGBA{0x00, 0x00, 0x00, 0xff},
-	color.RGBA{0x23, 0x23, 0x26, 0xff},
-	color.RGBA{0x30, 0xd1, 0x58, 0xff},
-	color.RGBA{0xff, 0x9f, 0x0a, 0xff},
-	color.RGBA{0xff, 0x45, 0x3a, 0xff},
-	color.RGBA{0x40, 0xc8, 0xe0, 0xff},
+	color.RGBA{0x3a, 0x3a, 0x3a, 0xff},
+	color.RGBA{0x00, 0xaf, 0x5f, 0xff},
+	color.RGBA{0xff, 0xaf, 0x00, 0xff},
+	color.RGBA{0xd7, 0x5f, 0x5f, 0xff},
+	color.RGBA{0x00, 0xaf, 0xd7, 0xff},
 	color.RGBA{0xff, 0xff, 0xff, 0xff},
-	color.RGBA{0x8e, 0x8e, 0x93, 0xff},
+	color.RGBA{0xbc, 0xbc, 0xbc, 0xff},
 	color.RGBA{0xd9, 0x77, 0x57, 0xff},
 }
 
@@ -75,8 +79,14 @@ func (p *panel) drawBar(x, y, w, h int, fraction float64, fill uint8, label stri
 	textX := x + (w-textWidth(label, labelScale))/2
 	textY := y + (h-glyphHeight*labelScale)/2
 
-	// На залитом фоне подпись тёмная, на пустом — светлая.
-	p.drawTextSplit(label, textX, textY, labelScale, x+filled, idxBackground, idxWhite)
+	// На залитом фоне подпись тёмная, на пустом — светло-серая. Исключение —
+	// красный: он достаточно тёмный, чтобы чёрные цифры на нём тонули, и в
+	// строке статуса на нём тоже пишут белым.
+	onFill := idxBackground
+	if fill == idxRed {
+		onFill = idxWhite
+	}
+	p.drawTextSplit(label, textX, textY, labelScale, x+filled, onFill, idxGrey)
 }
 
 // encode отдаёт GIF и его хэш: хэш попадает в имя файла, поэтому устройство
@@ -95,16 +105,49 @@ func (p *panel) encode() ([]byte, string, error) {
 // полоса сброса — во всю ширину, у неё нет метки и время узнаётся по формату.
 const (
 	labelX    = 6
+	labelWide = 22
 	barX      = 32
 	barWidth  = panelSize - barX - labelX
-	wideBarX  = labelX
-	wideWidth = panelSize - 2*labelX
 	barHeight = 20
 	rowGap    = 7
 	headerY   = 8
 	sparkSize = 17
 	firstRowY = 38
+	resetIcon = 15
 )
+
+// drawResetIcon рисует круговую стрелку — метку строки со временем до сброса.
+// Соседние строки подписаны словами, эта нет: «5H» и «7D» говорят про расход,
+// а здесь другая величина, и её честнее обозначить знаком, чем ещё одной парой
+// букв, которую пришлось бы расшифровывать.
+func (p *panel) drawResetIcon(x, y, size int, idx uint8) {
+	radius := float64(size) / 2
+	center := radius - 0.5
+
+	for dy := 0; dy < size; dy++ {
+		for dx := 0; dx < size; dx++ {
+			ox, oy := float64(dx)-center, float64(dy)-center
+			distance := math.Hypot(ox, oy)
+			if distance > radius || distance < radius-2.5 {
+				continue
+			}
+
+			// Разрыв кольца справа сверху — там начинается наконечник.
+			angle := math.Atan2(ox, -oy)
+			if angle > 0.2 && angle < 1.5 {
+				continue
+			}
+			p.img.SetColorIndex(x+dx, y+dy, idx)
+		}
+	}
+
+	// Наконечник стрелки у разрыва: три ряда, сужающиеся вправо.
+	tipX, tipY := x+size/2, y
+	for row := 0; row < 3; row++ {
+		p.fillRect(tipX+row, tipY+row, 3-row, 1, idx)
+		p.fillRect(tipX+row, tipY-row, 3-row, 1, idx)
+	}
+}
 
 // drawSparkle рисует искру Claude: четыре длинных луча по осям и четыре
 // коротких по диагоналям, сужающиеся к концам.
@@ -161,7 +204,8 @@ func render(state snapshot) ([]byte, string, error) {
 	p.drawBar(barX, rowY, barWidth, barHeight, five.fraction(), five.tint(idxGreen), five.percentLabel())
 
 	rowY += barHeight + rowGap
-	p.drawBar(wideBarX, rowY, wideWidth, barHeight, five.elapsedFraction(), resetTint(five), resetLabel(five))
+	p.drawResetIcon(labelX+(labelWide-resetIcon)/2, rowY+(barHeight-resetIcon)/2, resetIcon, idxGrey)
+	p.drawBar(barX, rowY, barWidth, barHeight, five.elapsedFraction(), resetTint(five), resetLabel(five))
 
 	rowY += barHeight + rowGap
 	p.drawText("7D", labelX, rowY+(barHeight-glyphHeight*2)/2, 2, idxGrey)

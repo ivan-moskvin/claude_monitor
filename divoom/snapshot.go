@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 )
 
@@ -94,6 +95,21 @@ func readSnapshot() snapshot {
 
 func (s snapshot) window(id string) usageWindow {
 	return s.windows[id]
+}
+
+// usageKey — то, ради чего панель вообще существует: сами проценты. Кадр
+// меняется и от обратного отсчёта, но его сдвиг на минуту подождёт, а
+// выросший расход нужно показать сразу.
+func (s snapshot) usageKey() string {
+	if s.err != "" {
+		return "err:" + s.err
+	}
+	var key strings.Builder
+	for _, id := range []string{"five_hour", "seven_day", "seven_day_opus"} {
+		w := s.windows[id]
+		fmt.Fprintf(&key, "%s=%.0f/%t;", id, w.used, w.expired)
+	}
+	return key.String()
 }
 
 // Длина пятичасового окна — по ней считается, сколько его уже прошло.
