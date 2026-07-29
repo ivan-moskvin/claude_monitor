@@ -98,6 +98,52 @@ func dropLock() {
 	}
 }
 
+// Stop останавливает мост и убирает за ним. Зовётся из `claudestatus uninstall`:
+// без этого мост переживает удаление бинаря, а экран устройства остаётся с
+// панелью и уходит в вечную загрузку, когда мост всё-таки умрёт.
+func Stop() {
+	path, err := lockPath()
+	if err != nil {
+		return
+	}
+
+	if data, err := os.ReadFile(path); err == nil {
+		if pid, err := strconv.Atoi(strings.TrimSpace(string(data))); err == nil && pid > 0 {
+			// TERM даёт мосту вернуть экрану прежний циферблат; не успел —
+			// добиваем и возвращаем экран сами.
+			_ = syscall.Kill(pid, syscall.SIGTERM)
+			for i := 0; i < 30 && syscall.Kill(pid, 0) == nil; i++ {
+				time.Sleep(100 * time.Millisecond)
+			}
+			if syscall.Kill(pid, 0) == nil {
+				_ = syscall.Kill(pid, syscall.SIGKILL)
+				restore()
+			}
+			fmt.Println("Остановлен мост Divoom")
+		}
+	}
+	_ = os.Remove(path)
+
+	// Конфиг с токеном устройства — тоже наше состояние, при удалении уходит.
+	if cfgPath, err := configPath(); err == nil {
+		if err := os.Remove(cfgPath); err == nil {
+			fmt.Printf("Удалён %s\n", cfgPath)
+		}
+	}
+}
+
+// restore возвращает экрану прежний циферблат по сохранённым в конфиге
+// значениям. Молчит: при удалении устройство может быть выключено, и это не
+// повод ронять uninstall.
+func restore() {
+	cfg, err := loadConfig()
+	if err != nil || cfg.IP == "" || cfg.PrevClockID == 0 {
+		return
+	}
+	target := device{ip: cfg.IP, token: cfg.LocalToken, lcd: cfg.LcdIndex}
+	_ = target.restoreScreen(cfg.PrevClockID, cfg.PrevIndependence)
+}
+
 // reachable — отвечает ли устройство на своём порту. Полноценную команду не
 // шлём: строка статуса не должна ждать ответа прошивки.
 func reachable(ip string) bool {

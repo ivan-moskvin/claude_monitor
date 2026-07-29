@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"github.com/ivan-moskvin/claude_monitor/divoom"
 	"os"
 	"path/filepath"
 )
@@ -96,6 +97,10 @@ func uninstall() error {
 	if err := removeFromSettings(exe); err != nil {
 		return err
 	}
+
+	// Мост живёт отдельным процессом и переживёт удаление бинаря, если его не
+	// остановить: панель на устройстве останется, а обновлять её будет некому.
+	divoom.Stop()
 
 	if dir, err := cacheDir(); err == nil {
 		if err := os.RemoveAll(dir); err == nil {

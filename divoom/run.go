@@ -13,6 +13,8 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
 )
 
@@ -81,14 +83,32 @@ func run(once bool) error {
 	}
 
 	if cfg.IP == "" {
-		ip, name, err := discover()
+		ip, name, deviceID, err := discover()
 		if err != nil {
 			return err
 		}
 		fmt.Printf("Найдено устройство %s: %s\n", name, ip)
-		cfg.IP = ip
+		cfg.IP, cfg.DeviceID = ip, deviceID
 		if err := cfg.save(); err != nil {
 			return err
+		}
+	}
+
+	// Идентификатор устройства мог не попасть в конфиг: при заданном вручную IP
+	// автопоиск не запускался, а раскладку экранов без него не спросить.
+	if cfg.DeviceID == 0 {
+		if _, _, deviceID, err := discover(); err == nil {
+			cfg.DeviceID = deviceID
+			_ = cfg.save()
+		}
+	}
+
+	// Запоминаем чужой циферблат до того, как займём экран: вернуть его при
+	// удалении иначе будет неоткуда.
+	if cfg.PrevClockID == 0 && cfg.DeviceID != 0 {
+		if clocks, independence, err := layout(cfg.DeviceID); err == nil && cfg.LcdIndex < len(clocks) {
+			cfg.PrevClockID, cfg.PrevIndependence = clocks[cfg.LcdIndex], independence
+			_ = cfg.save()
 		}
 	}
 
@@ -155,6 +175,17 @@ func run(once bool) error {
 		return err
 	}
 	defer dropLock()
+
+	// По сигналу возвращаем экрану прежний циферблат: иначе на нём останется
+	// последний кадр, за которым уже некому приходить.
+	stopping := make(chan os.Signal, 1)
+	signal.Notify(stopping, syscall.SIGTERM, syscall.SIGINT)
+	go func() {
+		<-stopping
+		_ = target.restoreScreen(cfg.PrevClockID, cfg.PrevIndependence)
+		dropLock()
+		os.Exit(0)
+	}()
 
 	fmt.Printf("Панель на экране %d устройства %s, обновление каждые %s\n",
 		cfg.LcdIndex, cfg.IP, pollInterval)

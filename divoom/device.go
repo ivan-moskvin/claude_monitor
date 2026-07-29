@@ -64,12 +64,59 @@ func (d device) showGif(url string) error {
 	})
 }
 
+// layout спрашивает облако, что показывают экраны устройства. Нужен один раз —
+// запомнить чужой циферблат, чтобы вернуть его при удалении.
+func layout(deviceID int) (clockIDs []int, independence int, err error) {
+	url := fmt.Sprintf("https://app.divoom-gz.com/Channel/Get5LcdInfoV2?DeviceType=LCD&DeviceId=%d", deviceID)
+	client := http.Client{Timeout: 15 * time.Second}
+	response, err := client.Get(url)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer response.Body.Close()
+
+	var result struct {
+		LcdIndependence     int `json:"LcdIndependence"`
+		LcdIndependenceList []struct {
+			LcdList []struct {
+				LcdClockID int `json:"LcdClockId"`
+			} `json:"LcdList"`
+		} `json:"LcdIndependenceList"`
+	}
+	if err := json.NewDecoder(response.Body).Decode(&result); err != nil {
+		return nil, 0, err
+	}
+	if len(result.LcdIndependenceList) == 0 {
+		return nil, 0, fmt.Errorf("устройство не отдало раскладку экранов")
+	}
+
+	for _, entry := range result.LcdIndependenceList[0].LcdList {
+		clockIDs = append(clockIDs, entry.LcdClockID)
+	}
+	return clockIDs, result.LcdIndependence, nil
+}
+
+// restoreScreen возвращает экрану циферблат, который был на нём до моста. Без
+// этого экран остаётся с последним кадром и уходит в вечную загрузку, как
+// только мост перестаёт отвечать на запросы устройства.
+func (d device) restoreScreen(clockID, independence int) error {
+	if clockID == 0 {
+		return fmt.Errorf("прежний циферблат неизвестен")
+	}
+	return d.call(map[string]any{
+		"Command":         "Channel/SetClockSelectId",
+		"LcdIndependence": independence,
+		"LcdIndex":        d.lcd,
+		"ClockId":         clockID,
+	})
+}
+
 // discover ищет Times Gate в локальной сети через облачный каталог.
-func discover() (ip string, name string, err error) {
+func discover() (ip string, name string, deviceID int, err error) {
 	client := http.Client{Timeout: 15 * time.Second}
 	response, err := client.Post(lanDirectory, "application/json", bytes.NewReader([]byte("{}")))
 	if err != nil {
-		return "", "", fmt.Errorf("каталог устройств недоступен: %w", err)
+		return "", "", 0, fmt.Errorf("каталог устройств недоступен: %w", err)
 	}
 	defer response.Body.Close()
 
@@ -77,17 +124,18 @@ func discover() (ip string, name string, err error) {
 		DeviceList []struct {
 			DeviceName      string `json:"DeviceName"`
 			DevicePrivateIP string `json:"DevicePrivateIP"`
+			DeviceID        int    `json:"DeviceId"`
 		} `json:"DeviceList"`
 	}
 	if err := json.NewDecoder(response.Body).Decode(&result); err != nil {
-		return "", "", err
+		return "", "", 0, err
 	}
 	if len(result.DeviceList) == 0 {
-		return "", "", fmt.Errorf("устройств Divoom в этой сети не видно")
+		return "", "", 0, fmt.Errorf("устройств Divoom в этой сети не видно")
 	}
 
 	first := result.DeviceList[0]
-	return first.DevicePrivateIP, first.DeviceName, nil
+	return first.DevicePrivateIP, first.DeviceName, first.DeviceID, nil
 }
 
 // localIP — адрес, с которого нас увидит устройство. Соединение UDP ничего
