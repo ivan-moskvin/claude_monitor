@@ -15,11 +15,13 @@ import (
 )
 
 const (
-	// Тот же интервал опроса, что у виджета: снапшот обновляется не чаще.
-	pollInterval = 15 * time.Second
-	// Устройство при получении команды моргает загрузкой, поэтому не шлём
-	// кадры чаще, даже если обратный отсчёт уже сменил минуту.
-	minSendInterval = 60 * time.Second
+	// Снапшот переписывается на каждый вызов строки статуса, то есть часто:
+	// опрашиваем бодро, чтение файла ничего не стоит.
+	pollInterval = 5 * time.Second
+	// Устройство моргает загрузкой на каждый кадр, поэтому сдвиг обратного
+	// отсчёта столько ждёт. Изменившиеся проценты этот порог не соблюдают:
+	// ради них панель и висит на стене.
+	minSendInterval = 30 * time.Second
 	// Периодически повторяем последний кадр: устройство могло перезагрузиться
 	// или потерять картинку, а снапшот при этом не меняется неделями.
 	resendAfter = 15 * time.Minute
@@ -89,20 +91,27 @@ func run(once bool) error {
 
 	target := device{ip: cfg.IP, token: cfg.LocalToken, lcd: cfg.LcdIndex}
 
-	var lastHash string
+	var lastHash, lastUsage string
 	var lastSent time.Time
 
 	send := func(wait bool) error {
-		data, hash, err := render(readSnapshot())
+		state := readSnapshot()
+		usage := state.usageKey()
+
+		data, hash, err := render(state)
 		if err != nil {
 			return err
 		}
 
-		unchanged := hash == lastHash
-		if unchanged && time.Since(lastSent) < resendAfter {
-			return nil
-		}
-		if !unchanged && !lastSent.IsZero() && time.Since(lastSent) < minSendInterval {
+		switch {
+		case hash == lastHash:
+			// Кадр тот же — повторяем изредка, чтобы устройство не потеряло
+			// картинку после своей перезагрузки.
+			if time.Since(lastSent) < resendAfter {
+				return nil
+			}
+		case usage == lastUsage && !lastSent.IsZero() && time.Since(lastSent) < minSendInterval:
+			// Изменился только обратный отсчёт — не гоняем устройство ради него.
 			return nil
 		}
 
@@ -110,7 +119,7 @@ func run(once bool) error {
 		if err := target.showGif(url); err != nil {
 			return err
 		}
-		lastHash, lastSent = hash, time.Now()
+		lastHash, lastUsage, lastSent = hash, usage, time.Now()
 
 		// Команда доставляется мгновенно, а за картинкой устройство приходит
 		// отдельным запросом — при разовой отправке нельзя выходить раньше,
