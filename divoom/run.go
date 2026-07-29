@@ -1,15 +1,17 @@
-// Команда claude-divoom — панель с лимитами Claude на экране Divoom Times Gate.
+// Пакет divoom — подкоманда `claudestatus divoom`: панель с лимитами Claude
+// на экране Divoom Times Gate.
 //
 // Читает тот же ~/.claude/usage-snapshot.json, что и строка статуса, рисует
 // панель 128×128 и отдаёт её устройству. Кадр устройство скачивает само:
 // мост поднимает локальный HTTP-сервер и присылает ссылку командой
 // Device/PlayGif — заливка пикселей (Draw/SendHttpGif) на прошивке Times Gate
 // принимается, но ничего не рисует.
-package main
+package divoom
 
 import (
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"time"
 )
@@ -29,35 +31,46 @@ const (
 	fetchTimeout = 20 * time.Second
 )
 
-func main() {
-	doLogin := flag.Bool("login", false, "получить LocalToken устройства через аккаунт Divoom")
-	once := flag.Bool("once", false, "отправить панель один раз и выйти")
-	preview := flag.String("preview", "", "сохранить кадр в файл вместо отправки — смотреть панель, не трогая устройство")
-	flag.Parse()
+const usage = `claudestatus divoom — панель лимитов на экране Divoom Times Gate.
 
-	if *doLogin {
-		if err := login(); err != nil {
-			fmt.Fprintln(os.Stderr, err)
-			os.Exit(1)
-		}
-		return
+Использование:
+  claudestatus divoom            держать панель обновлённой (работает, пока запущен)
+  claudestatus divoom --login    получить LocalToken устройства через аккаунт Divoom
+  claudestatus divoom --once     отправить панель один раз и выйти
+  claudestatus divoom --preview FILE   сохранить кадр в файл, не трогая устройство
+
+Настройки — ~/.claude/divoom.json, создаёт --login.
+`
+
+// Run — точка входа подкоманды. Ошибки возвращаются наверх: печатает их и
+// выбирает код возврата CLI, а не пакет.
+func Run(args []string) error {
+	flags := flag.NewFlagSet("divoom", flag.ContinueOnError)
+	flags.SetOutput(io.Discard)
+	doLogin := flags.Bool("login", false, "получить LocalToken устройства через аккаунт Divoom")
+	once := flags.Bool("once", false, "отправить панель один раз и выйти")
+	preview := flags.String("preview", "", "сохранить кадр в файл вместо отправки")
+	help := flags.Bool("help", false, "справка")
+
+	if err := flags.Parse(args); err != nil {
+		return fmt.Errorf("%w\n\n%s", err, usage)
+	}
+	if *help {
+		fmt.Print(usage)
+		return nil
 	}
 
-	if *preview != "" {
+	switch {
+	case *doLogin:
+		return login()
+	case *preview != "":
 		data, _, err := render(readSnapshot())
-		if err == nil {
-			err = os.WriteFile(*preview, data, 0o644)
-		}
 		if err != nil {
-			fmt.Fprintln(os.Stderr, err)
-			os.Exit(1)
+			return err
 		}
-		return
-	}
-
-	if err := run(*once); err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+		return os.WriteFile(*preview, data, 0o644)
+	default:
+		return run(*once)
 	}
 }
 
