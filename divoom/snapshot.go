@@ -4,14 +4,18 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/ivan-moskvin/claude_monitor/paths"
 )
 
 // Снапшот старше этого возраста описывает прошлое: Claude Code обновляет его
 // только во время сессии.
 const staleAfter = 90 * time.Second
+
+// Имя общего с writer'ом файла лимитов.
+const snapshotName = "usage-snapshot.json"
 
 type snapshot struct {
 	windows map[string]usageWindow
@@ -37,11 +41,7 @@ type rawSnapshot struct {
 }
 
 func snapshotPath() (string, error) {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return "", err
-	}
-	return filepath.Join(home, ".claude", "usage-snapshot.json"), nil
+	return paths.File(snapshotName)
 }
 
 func readSnapshot() snapshot {

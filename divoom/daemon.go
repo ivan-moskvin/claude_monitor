@@ -5,9 +5,10 @@ import (
 	"net"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"strconv"
 	"strings"
+
+	"github.com/ivan-moskvin/claude_monitor/paths"
 	"time"
 )
 
@@ -24,11 +25,7 @@ const (
 )
 
 func lockPath() (string, error) {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return "", err
-	}
-	return filepath.Join(home, ".claude", lockName), nil
+	return paths.File(lockName)
 }
 
 // EnsureRunning поднимает мост в фоне, если устройство доступно, а мост ещё не
@@ -121,13 +118,6 @@ func Stop() {
 		}
 	}
 	_ = os.Remove(path)
-
-	// Конфиг с токеном устройства — тоже наше состояние, при удалении уходит.
-	if cfgPath, err := configPath(); err == nil {
-		if err := os.Remove(cfgPath); err == nil {
-			fmt.Printf("Удалён %s\n", cfgPath)
-		}
-	}
 }
 
 // restore возвращает экрану прежний циферблат по сохранённым в конфиге

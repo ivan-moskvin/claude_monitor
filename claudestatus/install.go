@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/ivan-moskvin/claude_monitor/divoom"
+	"github.com/ivan-moskvin/claude_monitor/paths"
 	"os"
 	"path/filepath"
 )
@@ -101,6 +102,13 @@ func uninstall() error {
 	// Мост живёт отдельным процессом и переживёт удаление бинаря, если его не
 	// остановить: панель на устройстве останется, а обновлять её будет некому.
 	divoom.Stop()
+
+	// Каталог приложения целиком: снимок лимитов, настройки моста, pid-файл.
+	if dir, err := paths.Dir(); err == nil {
+		if err := os.RemoveAll(dir); err == nil {
+			fmt.Printf("Удалён %s\n", dir)
+		}
+	}
 
 	if dir, err := cacheDir(); err == nil {
 		if err := os.RemoveAll(dir); err == nil {

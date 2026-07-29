@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+
+	"github.com/ivan-moskvin/claude_monitor/paths"
 	"time"
 )
 
@@ -19,12 +21,8 @@ func saveSnapshot(limits map[string]json.RawMessage) error {
 		return nil
 	}
 
-	home, err := os.UserHomeDir()
+	dir, err := paths.Dir()
 	if err != nil {
-		return err
-	}
-	dir := filepath.Join(home, ".claude")
-	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return err
 	}
 

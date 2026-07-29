@@ -4,7 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"path/filepath"
+
+	"github.com/ivan-moskvin/claude_monitor/paths"
 )
 
 // Настройки лежат рядом со снапшотом, в каталоге Claude Code.
@@ -30,11 +31,7 @@ type config struct {
 }
 
 func configPath() (string, error) {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return "", err
-	}
-	return filepath.Join(home, ".claude", configName), nil
+	return paths.File(configName)
 }
 
 func loadConfig() (config, error) {
@@ -69,10 +66,6 @@ func (c config) save() error {
 	if err != nil {
 		return err
 	}
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return err
-	}
-
 	data, err := json.MarshalIndent(c, "", "  ")
 	if err != nil {
 		return err
