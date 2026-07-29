@@ -10,20 +10,17 @@ import (
 	"os"
 )
 
-// version подставляется при сборке: -X main.version=$(git describe --tags).
-// Сборка без тега остаётся dev: сравнивать её номер не с чем, поэтому значок
-// обновления для неё не зажигается.
-const devVersion = "dev"
-
-var version = devVersion
+// Версия берётся из самого бинаря (см. version): у сборки не из тега номера
+// нет, поэтому значок обновления для неё не зажигается.
+const devVersion = "сборка из исходников"
 
 const usage = `claudestatus — лимиты Claude в строке статуса Claude Code.
 
 Использование:
   claudestatus            строка статуса: JSON сессии на stdin, строка на stdout
   claudestatus install    прописать себя в ~/.claude/settings.json
-  claudestatus check      проверить, вышел ли новый тег
-  claudestatus update     обновиться до последнего тега и пересобраться
+  claudestatus check      проверить, вышла ли новая версия
+  claudestatus update     переустановить себя последней версией
   claudestatus version    показать версию
   claudestatus help       эта справка
 
@@ -41,13 +38,13 @@ func main() {
 	// --install понимаем по-прежнему: он прописан в старых скриптах установки.
 	switch args[0] {
 	case "install", "--install":
-		exit(install())
+		exit(installSelf())
 	case "check":
 		exit(check(hasFlag(args[1:], "--quiet")))
 	case "update":
 		exit(update())
 	case "version", "--version", "-v":
-		fmt.Println(version)
+		fmt.Println(version())
 	case "help", "--help", "-h":
 		fmt.Print(usage)
 	default:
