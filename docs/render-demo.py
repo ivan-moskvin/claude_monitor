@@ -21,7 +21,21 @@ import time
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 OUT_HTML = ROOT / "docs" / "statusline-demo.html"
 OUT_PNG = ROOT / "docs" / "statusline-demo.png"
+BADGE_HTML = ROOT / "docs" / "update-badge.html"
+BADGE_PNG = ROOT / "docs" / "update-badge.png"
 CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+
+# Версии на картинках: установленная и та, что «вышла».
+DEMO_VERSION = "v1.1.0"
+DEMO_PENDING = "v1.1.1"
+
+STYLE = (
+    "body{background:#1e1e1e;color:#d0d0d0;font:15px/1.9 'SF Mono',Menlo,monospace;padding:32px 36px;margin:0}"
+    "h2{font-size:13px;font-weight:600;color:#8a8a8a;letter-spacing:.08em;text-transform:uppercase;"
+    "margin:28px 0 10px}h2:first-child{margin-top:0}"
+    "table{border-collapse:collapse}td{padding:3px 0;vertical-align:middle;white-space:nowrap}"
+    ".note{color:#6f6f6f;font-size:13px;padding-left:28px}"
+)
 
 SGR = re.compile(r"\x1b\[([0-9;]*)m")
 
@@ -103,7 +117,7 @@ def ansi_to_html(line: str) -> str:
 
 
 def build_writer(pending_tag: str | None = None) -> tuple[pathlib.Path, pathlib.Path]:
-    """Собирает бинарь версии v1.0.0 и отдаёт его вместе с домашним каталогом.
+    """Собирает бинарь демо-версии и отдаёт его вместе с домашним каталогом.
 
     С pending_tag в кэш этого дома кладётся готовый результат проверки — так
     рисуется состояние «вышла новая версия», без единого запроса в сеть.
@@ -111,7 +125,7 @@ def build_writer(pending_tag: str | None = None) -> tuple[pathlib.Path, pathlib.
     home = pathlib.Path(tempfile.mkdtemp())
     binary = home / "claudestatus"
     subprocess.run(
-        ["go", "build", "-ldflags", "-X main.versionOverride=v1.0.0", "-o", str(binary), "./claudestatus"],
+        ["go", "build", "-ldflags", f"-X main.versionOverride={DEMO_VERSION}", "-o", str(binary), "./claudestatus"],
         cwd=ROOT, check=True,
     )
 
@@ -182,9 +196,10 @@ def main() -> None:
     ]
     sections.append(("Крайние случаи", edges))
 
-    pending = build_writer(pending_tag="v1.0.1")
+    pending = build_writer(pending_tag=DEMO_PENDING)
+    pending_session = session(effort="high", five=42, week=57, left=2 * 3600 + 30 * 60)
     sections.append(("Вышла новая версия — обновиться командой claudestatus update", [
-        ("установлено v1.0.0", session(effort="high", five=42, week=57, left=2 * 3600 + 30 * 60), pending),
+        (f"установлено {DEMO_VERSION}", pending_session, pending),
     ]))
 
     blocks = []
@@ -195,29 +210,39 @@ def main() -> None:
             items.append(f'<tr><td class="line">{line}</td><td class="note">{html.escape(note)}</td></tr>')
         blocks.append(f'<h2>{html.escape(title)}</h2><table>{"".join(items)}</table>')
 
-    OUT_HTML.write_text(
-        "<!doctype html><meta charset='utf-8'><title>Строка статуса — состояния</title>"
-        "<style>"
-        "body{background:#1e1e1e;color:#d0d0d0;font:15px/1.9 'SF Mono',Menlo,monospace;padding:32px 36px;margin:0}"
-        "h2{font-size:13px;font-weight:600;color:#8a8a8a;letter-spacing:.08em;text-transform:uppercase;"
-        "margin:28px 0 10px}h2:first-child{margin-top:0}"
-        "table{border-collapse:collapse}td{padding:3px 0;vertical-align:middle;white-space:nowrap}"
-        ".note{color:#6f6f6f;font-size:13px;padding-left:28px}"
-        "</style>" + "".join(blocks) + "\n"
-    )
+    OUT_HTML.write_text(page("Строка статуса — состояния", "".join(blocks)))
     print(OUT_HTML)
 
-    if pathlib.Path(CHROME).exists():
-        shot = pathlib.Path(tempfile.mkdtemp())
-        subprocess.run(
-            [CHROME, "--headless", "--disable-gpu", "--hide-scrollbars",
-             "--window-size=1180,905", f"--screenshot={OUT_PNG}", OUT_HTML.as_uri()],
-            capture_output=True, check=True, cwd=shot,
-        )
-        shutil.rmtree(shot, ignore_errors=True)
-        print(OUT_PNG)
-    else:
+    # Отдельная картинка для README: одна живая строка со значком обновления.
+    badge = ansi_to_html(render(pending, pending_session))
+    BADGE_HTML.write_text(page(
+        "Строка статуса — вышла новая версия",
+        f'<table><tr><td class="line">{badge}</td></tr></table>',
+    ))
+    print(BADGE_HTML)
+
+    screenshot(OUT_HTML, OUT_PNG, "1180,905")
+    screenshot(BADGE_HTML, BADGE_PNG, "760,86")
+
+
+def page(title: str, body: str) -> str:
+    return (f"<!doctype html><meta charset='utf-8'><title>{html.escape(title)}</title>"
+            f"<style>{STYLE}</style>{body}\n")
+
+
+def screenshot(source: pathlib.Path, target: pathlib.Path, size: str) -> None:
+    if not pathlib.Path(CHROME).exists():
         print("Chrome не найден — PNG не собран", file=sys.stderr)
+        return
+
+    shot = pathlib.Path(tempfile.mkdtemp())
+    subprocess.run(
+        [CHROME, "--headless", "--disable-gpu", "--hide-scrollbars",
+         f"--window-size={size}", f"--screenshot={target}", source.as_uri()],
+        capture_output=True, check=True, cwd=shot,
+    )
+    shutil.rmtree(shot, ignore_errors=True)
+    print(target)
 
 
 main()
