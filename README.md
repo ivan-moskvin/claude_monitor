@@ -2,7 +2,7 @@
 
 Лимиты Claude в строке статуса Claude Code — видно во время работы, без `/usage`.
 
-![Строка статуса в Claude Code](docs/statusline.png)
+![Строка статуса в Claude Code](statusline.png)
 
 ## Установка
 

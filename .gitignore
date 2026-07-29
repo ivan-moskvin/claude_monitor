@@ -3,8 +3,6 @@
 
 bin/
 <<<<<<< HEAD
-docs/*.html
 =======
 claude-divoom
 >>>>>>> 93c4142 (feat: мост divoom подкомандой claudestatus divoom)
-docs/*.html
