@@ -183,13 +183,12 @@ func secondsLeft(resetsAt *float64) (int, bool) {
 	return seconds, true
 }
 
+// countdown пишет часы даже нулевые: без них подпись на переходе через час
+// сжимается с шести символов до трёх и цифры прыгают к центру полосы.
 func countdown(seconds int) string {
 	minutes := seconds / 60
 	hours, minutes := minutes/60, minutes%60
-	if hours > 0 {
-		return fmt.Sprintf("%dч %02dм", hours, minutes)
-	}
-	return fmt.Sprintf("%dм", minutes)
+	return fmt.Sprintf("%dч %02dм", hours, minutes)
 }
 
 // normalizeEpoch принимает Unix-время в секундах или миллисекундах.
