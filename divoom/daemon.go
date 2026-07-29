@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-	"syscall"
 	"time"
 )
 
@@ -54,9 +53,7 @@ func EnsureRunning() {
 	}
 	cmd := exec.Command(exe, "divoom")
 	cmd.Stdin, cmd.Stdout, cmd.Stderr = nil, nil, nil
-	// Отвязываем от группы процессов Claude Code: иначе мост умрёт вместе с
-	// вызовом строки статуса, ради которого его и подняли.
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
+	cmd.SysProcAttr = detachAttrs()
 	_ = cmd.Start()
 	if cmd.Process != nil {
 		_ = cmd.Process.Release()
@@ -77,8 +74,7 @@ func running() bool {
 	if err != nil || pid <= 0 {
 		return false
 	}
-	// Сигнал 0 ничего не делает процессу, но отвечает, существует ли он.
-	return syscall.Kill(pid, 0) == nil
+	return processAlive(pid)
 }
 
 func takeLock() error {
@@ -109,14 +105,16 @@ func Stop() {
 
 	if data, err := os.ReadFile(path); err == nil {
 		if pid, err := strconv.Atoi(strings.TrimSpace(string(data))); err == nil && pid > 0 {
-			// TERM даёт мосту вернуть экрану прежний циферблат; не успел —
-			// добиваем и возвращаем экран сами.
-			_ = syscall.Kill(pid, syscall.SIGTERM)
-			for i := 0; i < 30 && syscall.Kill(pid, 0) == nil; i++ {
+			// Где есть сигналы, мост возвращает экран сам; где нет — и там,
+			// где не успел, — возвращаем за него.
+			_ = terminate(pid)
+			for i := 0; i < 30 && processAlive(pid); i++ {
 				time.Sleep(100 * time.Millisecond)
 			}
-			if syscall.Kill(pid, 0) == nil {
-				_ = syscall.Kill(pid, syscall.SIGKILL)
+			if processAlive(pid) {
+				_ = forceKill(pid)
+			}
+			if !gracefulStop || processAlive(pid) {
 				restore()
 			}
 			fmt.Println("Остановлен мост Divoom")
