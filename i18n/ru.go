@@ -218,6 +218,4 @@ The settings are divoom.json in the application directory, created by on.
 	"RESET": "СБРОС",
 	"NO":    "НЕТ",
 	"DATA":  "ДАННЫХ",
-	"%dH":   "%dЧ",
-	"%dM":   "%dМ",
 }

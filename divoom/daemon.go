@@ -60,7 +60,6 @@ func EnsureRunning() {
 	}
 }
 
-// running — is a bridge already alive, judging by the pid file.
 func running() bool {
 	path, err := lockPath()
 	if err != nil {

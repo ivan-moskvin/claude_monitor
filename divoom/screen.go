@@ -11,10 +11,6 @@ import (
 // the human is shown 1–5: that is how they are labelled in the Divoom app.
 const screenCount = 5
 
-// screen shows or changes the screen the panel occupies. Changing it is more
-// than editing the config: the previous screen has to get its clock face back,
-// otherwise a dead picture stays on it, and the bridge has to move to the new
-// one.
 func screen(args []string) error {
 	cfg, err := loadConfig()
 	if err != nil {

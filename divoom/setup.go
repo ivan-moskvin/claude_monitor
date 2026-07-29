@@ -32,8 +32,6 @@ func on() error {
 	return nil
 }
 
-// off takes the panel away: gives the screen its clock face back and forgets
-// the device.
 func off() error {
 	if running() {
 		Stop()

@@ -120,9 +120,6 @@ func (w usageWindow) fraction() float64 {
 	return w.used / 100
 }
 
-// elapsedFraction — how much of the window has been lived through. The reset
-// bar shows time rather than usage: in the status line that is a scale of its
-// own.
 func (w usageWindow) elapsedFraction() float64 {
 	if w.expired || w.secondsLeft <= 0 {
 		return 1

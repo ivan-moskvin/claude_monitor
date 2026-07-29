@@ -68,10 +68,6 @@ func (p *panel) fillRect(x, y, w, h int, idx uint8) {
 	}
 }
 
-// drawBar draws a usage bar: the track across the full width, the filled part
-// in the level color, the label centered inside. The same scheme as in the
-// status line — the edge of the bar reads without a frame, and the number does
-// not drift away from it.
 func (p *panel) drawBar(x, y, w, h int, fraction float64, fill uint8, label string) {
 	fraction = math.Max(0, math.Min(1, fraction))
 	filled := int(math.Round(float64(w) * fraction))
@@ -120,10 +116,6 @@ const (
 	resetIcon = 15
 )
 
-// drawResetIcon draws a circular arrow — the mark of the row with the time left
-// until the reset. The neighbouring "5H" and "7D" talk about usage, here the
-// quantity is a different one, and a sign tells it apart better than yet
-// another pair of letters.
 func (p *panel) drawResetIcon(x, y, size int, idx uint8) {
 	radius := float64(size) / 2
 	center := radius - 0.5
@@ -154,8 +146,6 @@ func (p *panel) drawResetIcon(x, y, size int, idx uint8) {
 	}
 }
 
-// drawSparkle draws the Claude sparkle: four long rays along the axes and four
-// short ones along the diagonals.
 func (p *panel) drawSparkle(x, y, size int, idx uint8) {
 	radius := size / 2
 
@@ -181,8 +171,6 @@ func (p *panel) drawSparkle(x, y, size int, idx uint8) {
 	}
 }
 
-// render builds the panel out of the usage snapshot — three bars, as in the
-// status line: whatever runs out first comes first, the weekly window last.
 func render(state snapshot) ([]byte, string, error) {
 	p := newPanel()
 
@@ -224,9 +212,6 @@ func render(state snapshot) ([]byte, string, error) {
 	return p.encode()
 }
 
-// resetLabel — what to write inside the reset bar. The age of the snapshot does
-// not interfere here: the time left is counted from the absolute resets_at mark
-// and ticks correctly even when usage has not been updated for a long while.
 func resetLabel(five usageWindow) string {
 	if five.expired {
 		return i18n.T("RESET")
@@ -241,9 +226,6 @@ func resetTint(five usageWindow) uint8 {
 	return idxCyan
 }
 
-// ageLabel — how long the snapshot has not been updated. The usage percentages
-// may have grown in the meantime, which is why the mark stands by the header
-// and not by the numbers of a window.
 func ageLabel(age time.Duration) string {
 	if hours := int(age.Hours()); hours > 0 {
 		return fmt.Sprintf(i18n.T("%dH"), hours)

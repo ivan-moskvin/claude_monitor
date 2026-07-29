@@ -39,7 +39,6 @@ func newAssets(port int, allowIP string) *assets {
 	return &assets{port: port, allowIP: allowIP, frames: make(map[string][]byte), fetched: make(chan string, 8)}
 }
 
-// awaitFetch waits until the device has taken the frame behind this link.
 func (a *assets) awaitFetch(url string, timeout time.Duration) bool {
 	deadline := time.After(timeout)
 	for {
@@ -74,8 +73,6 @@ func (a *assets) listen() error {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", a.serve)
 
-	// Timeouts, so that a stuck connection does not hold the bridge: we serve
-	// one client with one small file.
 	server := &http.Server{
 		Handler:           mux,
 		ReadHeaderTimeout: 5 * time.Second,
@@ -115,9 +112,6 @@ func (a *assets) serve(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// publish stores a frame and returns the link to it. The hash in the name is
-// what makes the device re-download the picture: without a change of address it
-// shows the previous one.
 func (a *assets) publish(hostIP, hash string, data []byte) string {
 	path := "/panel-" + hash + ".gif"
 

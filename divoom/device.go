@@ -65,8 +65,6 @@ func (d device) showGif(url string) error {
 	})
 }
 
-// layout asks the cloud what the screens of the device are showing. Needed
-// once — to remember somebody else's clock face and give it back on uninstall.
 func layout(deviceID int) (clockIDs []int, independence int, err error) {
 	url := fmt.Sprintf("https://app.divoom-gz.com/Channel/Get5LcdInfoV2?DeviceType=LCD&DeviceId=%d", deviceID)
 	client := http.Client{Timeout: 15 * time.Second}
@@ -112,8 +110,6 @@ func (d device) restoreScreen(clockID, independence int) error {
 	})
 }
 
-// discover looks for a Times Gate on the local network through the cloud
-// directory.
 func discover() (ip string, name string, deviceID int, err error) {
 	client := http.Client{Timeout: 15 * time.Second}
 	response, err := client.Post(lanDirectory, "application/json", bytes.NewReader([]byte("{}")))

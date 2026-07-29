@@ -39,8 +39,6 @@ var glyphs = map[rune][7]string{
 	'L': {"10000", "10000", "10000", "10000", "10000", "10000", "11111"},
 	'?': {"01110", "10001", "00001", "00010", "00100", "00000", "00100"},
 	' ': {"00000", "00000", "00000", "00000", "00000", "00000", "00000"},
-	'Ч': {"10001", "10001", "10001", "01111", "00001", "00001", "00001"},
-	'М': {"10001", "11011", "10101", "10001", "10001", "10001", "10001"},
 	'Д': {"00111", "00101", "00101", "01001", "01001", "11111", "10001"},
 	'А': {"01110", "10001", "10001", "11111", "10001", "10001", "10001"},
 	'Б': {"11110", "10000", "10000", "11110", "10001", "10001", "11110"},
@@ -59,7 +57,6 @@ const (
 	glyphHeight = 7
 )
 
-// textWidth — the width of a string in pixels: one pixel between the glyphs.
 func textWidth(text string, scale int) int {
 	runes := []rune(text)
 	if len(runes) == 0 {
@@ -72,9 +69,6 @@ func (p *panel) drawText(text string, x, y, scale int, idx uint8) {
 	p.drawTextSplit(text, x, y, scale, panelSize, idx, idx)
 }
 
-// drawTextSplit paints the text in two colors: left of splitX in one, right of
-// it in the other. That keeps the label readable when the bar is half full and
-// a letter stands right on the border between the filled and the empty part.
 func (p *panel) drawTextSplit(text string, x, y, scale, splitX int, left, right uint8) {
 	cursor := x
 	for _, r := range text {
