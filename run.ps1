@@ -1,5 +1,5 @@
-# Собирает строку статуса из исходников и прописывает её в Claude Code.
-# Бинарь живёт прямо в репозитории: никакой установки в систему нет.
+# Собирает claudestatus из исходников и прописывает строку статуса в Claude Code.
+# Бинарь живёт прямо в репозитории, наружу торчит только запись bin\ в PATH.
 
 param([switch]$Yes)
 
@@ -7,7 +7,8 @@ $ErrorActionPreference = "Stop"
 
 Set-Location $PSScriptRoot
 $root = $PSScriptRoot
-$binary = Join-Path $root "bin\claude-statusline.exe"
+$binDir = Join-Path $root "bin"
+$binary = Join-Path $binDir "claudestatus.exe"
 
 function Have($name) { return [bool](Get-Command $name -ErrorAction SilentlyContinue) }
 
@@ -47,18 +48,45 @@ function Ensure-Go {
     }
 }
 
+# Симлинков без прав администратора в Windows нет, поэтому команда становится
+# доступной через PATH пользователя — сам каталог bin\ остаётся в клоне.
+function Add-ToUserPath($dir) {
+    $current = [Environment]::GetEnvironmentVariable("Path", "User")
+    $entries = @()
+    if ($current) { $entries = $current -split ";" | Where-Object { $_ } }
+    if ($entries -contains $dir) { return $false }
+
+    [Environment]::SetEnvironmentVariable("Path", (($entries + $dir) -join ";"), "User")
+    return $true
+}
+
 Ensure-Go
 
-Write-Host "==> Сборка"
-New-Item -ItemType Directory -Force -Path (Join-Path $root "bin") | Out-Null
+# Версию вшиваем в бинарь: по ней claudestatus check понимает, отстал ли клон.
+$version = (git -C $root describe --tags --always --dirty 2>$null)
+if (-not $version) { $version = "dev" }
 
-Push-Location (Join-Path $root "statusline")
+Write-Host "==> Сборка ($version)"
+New-Item -ItemType Directory -Force -Path $binDir | Out-Null
+
+Push-Location (Join-Path $root "claudestatus")
 $env:CGO_ENABLED = "0"
-go build -trimpath -ldflags "-s -w" -o $binary .
+go build -trimpath -ldflags "-s -w -X main.version=$version" -o $binary .
 Pop-Location
 
+# Бинарь до переименования утилиты — иначе в bin\ остаётся мёртвый файл.
+Remove-Item -Force -ErrorAction SilentlyContinue (Join-Path $binDir "claude-statusline.exe")
+
+Write-Host "==> Путь"
+$added = Add-ToUserPath $binDir
+
 Write-Host "==> Установка"
-& $binary --install
+& $binary install
 
 Write-Host ""
 Write-Host "Готово. Строка статуса появится в следующей сессии Claude Code."
+if ($added) {
+    Write-Host "Каталог bin добавлен в PATH — команда claudestatus заработает в новом терминале."
+} else {
+    Write-Host "Команда: claudestatus help"
+}

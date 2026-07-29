@@ -1,17 +1,10 @@
-// Команда claude-statusline — строка статуса с лимитами Claude.
-//
-// Claude Code вызывает её как statusLine-команду: подаёт JSON сессии на stdin,
-// забирает строку статуса из stdout. С ключом --install команда прописывает
-// себя в ~/.claude/settings.json.
 package main
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"math"
 	"os"
-	"path/filepath"
 	"strings"
 	"time"
 )
@@ -28,6 +21,7 @@ const (
 	colorOrange    = 214
 	colorRed       = 167
 	colorCyan      = 38
+	colorUpdate    = 178
 	colorEmptyBG   = 237
 	colorEmptyFG   = 250
 	colorDarkText  = 16
@@ -64,18 +58,12 @@ type window struct {
 	ResetsAt       *float64 `json:"resets_at"`
 }
 
-func main() {
-	if len(os.Args) > 1 {
-		if os.Args[1] != "--install" {
-			fmt.Fprintf(os.Stderr, "Неизвестный аргумент: %s (есть только --install)\n", os.Args[1])
-			os.Exit(2)
-		}
-		if err := install(); err != nil {
-			fmt.Fprintln(os.Stderr, err)
-			os.Exit(1)
-		}
-		return
-	}
+// statusline печатает строку по JSON сессии со stdin — это режим по умолчанию,
+// именно он прописан в settings.json.
+func statusline() {
+	// Проверку обновлений заводим в любом случае: даже пустой вход означает,
+	// что Claude Code жив и строку кто-то видит.
+	defer autoCheck()
 
 	var input sessionInput
 	if err := json.NewDecoder(os.Stdin).Decode(&input); err != nil {
@@ -111,6 +99,12 @@ func main() {
 	if week := parseWindow(input.RateLimits["seven_day"]); week.UsedPercentage != nil {
 		used := *week.UsedPercentage
 		parts = append(parts, fmt.Sprintf("7d %s", labeledBar(used, percentLabel(used), usageColor(used))))
+	}
+
+	// Значок обновления — в самом конце: он не про текущую сессию и не должен
+	// сдвигать цифры лимитов, к месту которых глаз уже привык.
+	if tag, ok := updateAvailable(); ok {
+		parts = append(parts, colorized("↑ "+tag, colorUpdate))
 	}
 
 	if len(parts) == 0 {
@@ -205,62 +199,4 @@ func parseWindow(raw json.RawMessage) window {
 		_ = json.Unmarshal(raw, &w)
 	}
 	return w
-}
-
-// install прописывает эту команду в statusLine ~/.claude/settings.json.
-// Путь берём абсолютный: строка статуса вызывается из любого каталога.
-func install() error {
-	exe, err := os.Executable()
-	if err != nil {
-		return fmt.Errorf("не удалось определить свой путь: %w", err)
-	}
-	if exe, err = filepath.EvalSymlinks(exe); err != nil {
-		return fmt.Errorf("не удалось определить свой путь: %w", err)
-	}
-
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return err
-	}
-	dir := filepath.Join(home, ".claude")
-	path := filepath.Join(dir, "settings.json")
-
-	settings := map[string]any{}
-	data, err := os.ReadFile(path)
-	switch {
-	case err == nil:
-		if len(bytes.TrimSpace(data)) > 0 {
-			if json.Unmarshal(data, &settings) != nil {
-				return fmt.Errorf("%s не разбирается — поправьте его вручную", path)
-			}
-		}
-		// Бэкап до записи и только при существующем файле —
-		// иначе затрём чужие настройки без возможности откатиться.
-		if err := os.WriteFile(path+".bak", data, 0o644); err != nil {
-			return fmt.Errorf("не удалось сделать бэкап settings.json: %w", err)
-		}
-	case !os.IsNotExist(err):
-		return fmt.Errorf("не удалось прочитать settings.json: %w", err)
-	}
-
-	// Кавычки — на случай пробелов в пути к репозиторию.
-	command := fmt.Sprintf("%q", exe)
-	if previous, ok := settings["statusLine"].(map[string]any); ok {
-		if was, _ := previous["command"].(string); was != "" && was != command {
-			fmt.Printf("Заменяю прежнюю строку статуса: %s\n", was)
-			fmt.Printf("Прежние настройки — в %s.bak\n", path)
-		}
-	}
-
-	settings["statusLine"] = map[string]string{"type": "command", "command": command}
-
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return fmt.Errorf("не удалось создать %s: %w", dir, err)
-	}
-
-	updated, err := json.MarshalIndent(settings, "", "  ")
-	if err != nil {
-		return err
-	}
-	return os.WriteFile(path, append(updated, '\n'), 0o644)
 }
