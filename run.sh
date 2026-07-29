@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
-# Собирает строку статуса из исходников и прописывает её в Claude Code.
-# Бинарь живёт прямо в репозитории: никакой установки в систему нет.
+# Собирает claudestatus из исходников и прописывает строку статуса в Claude Code.
+# Бинарь живёт прямо в репозитории, наружу торчит только ссылка в ~/.local/bin.
 set -euo pipefail
 
 cd "$(dirname "$0")"
 ROOT="$PWD"
-BINARY="$ROOT/bin/claude-statusline"
+BINARY="$ROOT/bin/claudestatus"
+LINK_DIR="$HOME/.local/bin"
 
 ASSUME_YES=0
 case "${1:-}" in
@@ -56,12 +57,28 @@ ensure_go() {
 
 ensure_go
 
-echo "==> Сборка"
+# Версию вшиваем в бинарь: по ней claudestatus check понимает, отстал ли клон.
+VERSION="$(git -C "$ROOT" describe --tags --always --dirty 2>/dev/null || echo dev)"
+
+echo "==> Сборка ($VERSION)"
 mkdir -p "$ROOT/bin"
-(cd statusline && go build -trimpath -ldflags="-s -w" -o "$BINARY" .)
+(cd claudestatus && CGO_ENABLED=0 go build -trimpath -ldflags="-s -w -X main.version=$VERSION" -o "$BINARY" .)
+
+# Бинарь до переименования утилиты — иначе в bin/ остаётся мёртвый файл.
+rm -f "$ROOT/bin/claude-statusline"
+
+echo "==> Ссылка в $LINK_DIR"
+mkdir -p "$LINK_DIR"
+ln -sfn "$BINARY" "$LINK_DIR/claudestatus"
 
 echo "==> Установка"
-"$BINARY" --install
+"$BINARY" install
 
 echo
 echo "Готово. Строка статуса появится в следующей сессии Claude Code."
+
+case ":$PATH:" in
+    *":$LINK_DIR:"*) echo "Команда: claudestatus help" ;;
+    *) echo "Чтобы команда claudestatus вызывалась откуда угодно, добавьте в ~/.zshrc:"
+       echo "  export PATH=\"$LINK_DIR:\$PATH\"" ;;
+esac
