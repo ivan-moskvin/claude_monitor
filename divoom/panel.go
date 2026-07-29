@@ -9,6 +9,7 @@ import (
 	"image/color"
 	"image/gif"
 	"math"
+	"time"
 )
 
 // Устройство принимает GIF размером 16, 32, 64 или 128 пикселей.
@@ -140,6 +141,13 @@ func render(state snapshot) ([]byte, string, error) {
 	p.drawSparkle(labelX, headerY, sparkSize, idxClaude)
 	p.drawText("CLAUDE", labelX+sparkSize+7, headerY+(sparkSize-glyphHeight*2)/2, 2, idxWhite)
 
+	// Данные растут только в активной сессии Claude Code: если снапшот давно
+	// не обновлялся, проценты ниже описывают прошлое, и это должно быть видно.
+	if state.stale {
+		label := ageLabel(state.age)
+		p.drawText(label, panelSize-labelX-textWidth(label, 2), headerY+(sparkSize-glyphHeight*2)/2, 2, idxGrey)
+	}
+
 	if state.err != "" {
 		p.drawTextCentered("НЕТ", 52, 3, idxGrey)
 		p.drawTextCentered("ДАННЫХ", 86, 2, idxGrey)
@@ -153,7 +161,7 @@ func render(state snapshot) ([]byte, string, error) {
 	p.drawBar(barX, rowY, barWidth, barHeight, five.fraction(), five.tint(idxGreen), five.percentLabel())
 
 	rowY += barHeight + rowGap
-	p.drawBar(wideBarX, rowY, wideWidth, barHeight, five.elapsedFraction(), resetTint(state, five), resetLabel(state, five))
+	p.drawBar(wideBarX, rowY, wideWidth, barHeight, five.elapsedFraction(), resetTint(five), resetLabel(five))
 
 	rowY += barHeight + rowGap
 	p.drawText("7D", labelX, rowY+(barHeight-glyphHeight*2)/2, 2, idxGrey)
@@ -162,25 +170,30 @@ func render(state snapshot) ([]byte, string, error) {
 	return p.encode()
 }
 
-// resetLabel — что писать в полосе сброса. Окно уже сброшено или снапшот
-// устарел — об этом надо сказать прямо: цифры расхода описывают прошлое,
-// а не то, что тратится сейчас.
-func resetLabel(state snapshot, five usageWindow) string {
-	switch {
-	case five.expired:
+// resetLabel — что писать в полосе сброса. Возраст снапшота сюда не
+// вмешивается: время до сброса считается от абсолютной метки resets_at
+// и тикает верно, даже когда расход давно не обновлялся.
+func resetLabel(five usageWindow) string {
+	if five.expired {
 		return "СБРОС"
-	case state.stale:
-		return "СТАРЫЕ"
-	default:
-		return countdownLabel(five.secondsLeft)
 	}
+	return countdownLabel(five.secondsLeft)
 }
 
-func resetTint(state snapshot, five usageWindow) uint8 {
-	if five.expired || state.stale {
+func resetTint(five usageWindow) uint8 {
+	if five.expired {
 		return idxGrey
 	}
 	return idxCyan
+}
+
+// ageLabel — сколько снапшот не обновлялся. Проценты расхода за это время
+// могли вырасти, поэтому метка стоит у заголовка, а не у цифр окна.
+func ageLabel(age time.Duration) string {
+	if hours := int(age.Hours()); hours > 0 {
+		return fmt.Sprintf("%dЧ", hours)
+	}
+	return fmt.Sprintf("%dМ", int(age.Minutes()))
 }
 
 // countdownLabel — «2:41» до сброса окна. В строке статуса время подписано
