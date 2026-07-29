@@ -201,7 +201,7 @@ func render(state snapshot) ([]byte, string, error) {
 
 	rowY := firstRowY
 	p.drawText("5H", labelX, rowY+(barHeight-glyphHeight*2)/2, 2, idxGrey)
-	p.drawBar(barX, rowY, barWidth, barHeight, five.fraction(), five.tint(idxGreen), five.percentLabel())
+	p.drawBar(barX, rowY, barWidth, barHeight, five.fraction(), five.tint(), five.percentLabel())
 
 	rowY += barHeight + rowGap
 	p.drawResetIcon(labelX+(labelWide-resetIcon)/2, rowY+(barHeight-resetIcon)/2, resetIcon, idxGrey)
@@ -209,7 +209,7 @@ func render(state snapshot) ([]byte, string, error) {
 
 	rowY += barHeight + rowGap
 	p.drawText("7D", labelX, rowY+(barHeight-glyphHeight*2)/2, 2, idxGrey)
-	p.drawBar(barX, rowY, barWidth, barHeight, week.fraction(), week.tint(idxCyan), week.percentLabel())
+	p.drawBar(barX, rowY, barWidth, barHeight, week.fraction(), week.tint(), week.percentLabel())
 
 	return p.encode()
 }

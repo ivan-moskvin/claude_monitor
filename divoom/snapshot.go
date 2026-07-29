@@ -135,9 +135,11 @@ func (w usageWindow) percentLabel() string {
 	return fmt.Sprintf("%.0f%%", w.used)
 }
 
-// tint — единственное место с порогами цвета: до 60% базовый цвет окна,
-// до 85% оранжевый, дальше красный. Сброшенное окно гасим.
-func (w usageWindow) tint(base uint8) uint8 {
+// tint — единственное место с порогами цвета: до 60% зелёный, до 85%
+// оранжевый, дальше красный. Ровно как usageColor в строке статуса, и оба
+// окна расхода красятся одинаково: циан там только у полосы сброса, потому
+// что она показывает время, а не риск. Сброшенное окно гасим.
+func (w usageWindow) tint() uint8 {
 	switch {
 	case !w.present || w.expired:
 		return idxGrey
@@ -146,7 +148,7 @@ func (w usageWindow) tint(base uint8) uint8 {
 	case w.used >= 60:
 		return idxOrange
 	default:
-		return base
+		return idxGreen
 	}
 }
 
