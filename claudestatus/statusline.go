@@ -7,6 +7,8 @@ import (
 	"os"
 	"strings"
 	"time"
+
+	"github.com/ivan-moskvin/claude_monitor/divoom"
 )
 
 const (
@@ -70,6 +72,15 @@ func statusline() {
 		fmt.Println("—")
 		return
 	}
+
+	// Лимиты приходят только сюда и только во время сессии: больше их взять
+	// неоткуда. Снапшот — единственный способ показать их за пределами строки
+	// статуса; ошибку записи глотаем, строка статуса важнее.
+	_ = saveSnapshot(input.RateLimits)
+
+	// Панель на Divoom живёт, только пока запущен мост. Поднимаем его отсюда:
+	// проверка занимает миллисекунды, а без Times Gate в сети не делает ничего.
+	divoom.EnsureRunning()
 
 	var parts []string
 
