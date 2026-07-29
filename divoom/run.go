@@ -34,13 +34,14 @@ const (
 const usage = `claudestatus divoom — панель лимитов на экране Divoom Times Gate.
 
 Использование:
+  claudestatus divoom on           найти Times Gate в сети и включить панель
+  claudestatus divoom off          выключить панель и вернуть экрану циферблат
   claudestatus divoom              держать панель обновлённой (работает, пока запущен)
-  claudestatus divoom login        привязать устройство через аккаунт Divoom
   claudestatus divoom once         отправить панель один раз и выйти
   claudestatus divoom screen [N]   показать или занять экран 1–5
   claudestatus divoom preview FILE сохранить кадр в файл, не трогая устройство
 
-Настройки — divoom.json в каталоге приложения, создаёт login.
+Настройки — divoom.json в каталоге приложения, создаёт on.
 `
 
 // Run — точка входа подкоманды. Ошибки возвращаются наверх: печатает их и
@@ -51,8 +52,10 @@ func Run(args []string) error {
 	}
 
 	switch args[0] {
-	case "login":
-		return login()
+	case "on":
+		return on()
+	case "off":
+		return off()
 	case "once":
 		return run(true)
 	case "screen":
@@ -124,7 +127,7 @@ func run(once bool) error {
 		_ = cfg.save()
 	}
 
-	target := device{ip: cfg.IP, token: cfg.LocalToken, lcd: cfg.LcdIndex}
+	target := device{ip: cfg.IP, lcd: cfg.LcdIndex}
 
 	var lastHash, lastUsage string
 	var lastSent time.Time

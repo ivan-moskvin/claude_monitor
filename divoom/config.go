@@ -11,12 +11,12 @@ import (
 // Настройки лежат рядом со снапшотом, в каталоге Claude Code.
 const configName = "divoom.json"
 
+// Порт локального сервера с кадрами по умолчанию.
+const defaultPort = 8477
+
 type config struct {
 	// IP устройства. Пустой — ищем через облачный каталог при каждом запуске.
 	IP string `json:"ip"`
-	// LocalToken из настроек устройства: без него прошивка молча игнорирует
-	// команды рисования, отвечая при этом error_code 0.
-	LocalToken int `json:"local_token"`
 	// Экран 0–4, на который отдаём панель. Остальные не трогаем.
 	LcdIndex int `json:"lcd_index"`
 	// Порт локального сервера с кадрами; фиксированный, см. assets.
@@ -35,7 +35,7 @@ func configPath() (string, error) {
 }
 
 func loadConfig() (config, error) {
-	cfg := config{LcdIndex: 4, Port: 8477}
+	cfg := config{LcdIndex: 4, Port: defaultPort}
 
 	path, err := configPath()
 	if err != nil {
@@ -45,18 +45,15 @@ func loadConfig() (config, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return cfg, fmt.Errorf("нет %s — запустите с --login", path)
+			return cfg, fmt.Errorf("панель не включена — claudestatus divoom on")
 		}
 		return cfg, err
 	}
 	if err := json.Unmarshal(data, &cfg); err != nil {
 		return cfg, fmt.Errorf("%s не разбирается: %w", path, err)
 	}
-	if cfg.LocalToken == 0 {
-		return cfg, fmt.Errorf("в %s нет local_token — запустите с --login", path)
-	}
 	if cfg.Port == 0 {
-		cfg.Port = 8477
+		cfg.Port = defaultPort
 	}
 	return cfg, nil
 }
@@ -70,6 +67,5 @@ func (c config) save() error {
 	if err != nil {
 		return err
 	}
-	// Токен — доступ к устройству в локальной сети, чужим читать незачем.
 	return os.WriteFile(path, append(data, '\n'), 0o600)
 }

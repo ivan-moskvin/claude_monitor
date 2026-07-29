@@ -26,7 +26,8 @@ const zshCompletion = `_claudestatus() {
   )
   local -a divoom_commands
   divoom_commands=(
-    'login:привязать устройство через аккаунт Divoom'
+    'on:найти устройство и включить панель'
+    'off:выключить панель'
     'once:отправить панель один раз'
     'screen:показать или занять экран 1-5'
     'preview:сохранить кадр в файл'
@@ -44,7 +45,7 @@ compdef _claudestatus claudestatus
 
 const bashCompletion = `_claudestatus() {
   local commands="install check update uninstall divoom completion version help"
-  local divoom_commands="login once preview screen help"
+  local divoom_commands="on off once preview screen help"
 
   if [ "$COMP_CWORD" -eq 1 ]; then
     COMPREPLY=($(compgen -W "$commands" -- "${COMP_WORDS[1]}"))

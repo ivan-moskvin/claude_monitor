@@ -14,16 +14,14 @@ import (
 const lanDirectory = "https://app.divoom-gz.com/Device/ReturnSameLANDevice"
 
 type device struct {
-	ip    string
-	token int
-	lcd   int
+	ip  string
+	lcd int
 }
 
 // call шлёт команду устройству. HTTP 200 приходит всегда, поэтому настоящий
 // результат смотрим в error_code: он бывает и числом, и строкой с текстом
 // ошибки — «Request data illegal json» означает неизвестную команду.
 func (d device) call(payload map[string]any) error {
-	payload["LocalToken"] = d.token
 	body, err := json.Marshal(payload)
 	if err != nil {
 		return err

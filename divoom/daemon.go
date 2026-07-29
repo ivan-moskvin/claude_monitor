@@ -33,8 +33,8 @@ func lockPath() (string, error) {
 // здесь не повод портить строку.
 func EnsureRunning() {
 	cfg, err := loadConfig()
-	if err != nil || cfg.LocalToken == 0 {
-		// Мост не настроен — это не ошибка, у большинства нет Times Gate.
+	if err != nil || cfg.IP == "" {
+		// Панель не включена — это не ошибка, у большинства нет Times Gate.
 		return
 	}
 	if running() {
@@ -128,7 +128,7 @@ func restore() {
 	if err != nil || cfg.IP == "" || cfg.PrevClockID == 0 {
 		return
 	}
-	target := device{ip: cfg.IP, token: cfg.LocalToken, lcd: cfg.LcdIndex}
+	target := device{ip: cfg.IP, lcd: cfg.LcdIndex}
 	_ = target.restoreScreen(cfg.PrevClockID, cfg.PrevIndependence)
 }
 
