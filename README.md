@@ -2,7 +2,7 @@
 
 Лимиты Claude в строке статуса Claude Code — видно во время работы, без `/usage`.
 
-![Строка статуса в Claude Code](statusline.png)
+![Строка статуса в Claude Code](statusline.webp)
 
 ## Установка
 
@@ -61,7 +61,7 @@ claudestatus completion zsh >> ~/.zshrc    # или bash >> ~/.bashrc
 
 Те же лимиты — на экране [Divoom Times Gate](https://divoom.com/products/time-gate).
 
-![Панель лимитов на Divoom Times Gate](divoom.png)
+![Панель лимитов на Divoom Times Gate](divoom.webp)
 
 ```bash
 claudestatus divoom login
