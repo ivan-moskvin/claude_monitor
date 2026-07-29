@@ -36,12 +36,15 @@ const (
 
 // Шкала уровня reasoning effort: намеренно в фиолетово-розовой гамме,
 // чтобы не путалась с зелёным/оранжевым/красным полос расхода.
-var effortColors = map[string]int{
-	"low":    245,
-	"medium": 111,
-	"high":   141,
-	"xhigh":  171,
-	"max":    199,
+var effortStyles = map[string]struct {
+	label string
+	color int
+}{
+	"low":    {"Low", 245},
+	"medium": {"Medium", 111},
+	"high":   {"High", 141},
+	"xhigh":  {"xHigh", 171},
+	"max":    {"Max", 199},
 }
 
 type sessionInput struct {
@@ -82,8 +85,10 @@ func main() {
 	var parts []string
 
 	if name := input.Model.DisplayName; name != "" {
-		if color, ok := effortColors[input.Effort.Level]; ok {
-			name = colorized(name, color)
+		// Уровень пишем рядом с моделью: цвет отличает уровни друг от друга,
+		// но не говорит, какой именно сейчас включён.
+		if style, ok := effortStyles[input.Effort.Level]; ok {
+			name = colorized(name+" "+style.label, style.color)
 		}
 		parts = append(parts, name)
 	}
@@ -154,10 +159,10 @@ func colorized(text string, color int) string {
 	return fmt.Sprintf("\x1b[1;38;5;%dm%s\x1b[0m", color, text)
 }
 
-// percentLabel держит ширину подписи фиксированной, иначе текст внутри полосы
-// прыгает при переходе 3% → 20% → 100%.
+// percentLabel не выравнивает число по правому краю: ведущие пробелы попали бы
+// внутрь подписи и сдвинули её вправо от центра полосы.
 func percentLabel(percentage float64) string {
-	return fmt.Sprintf("%3.0f%%", percentage)
+	return fmt.Sprintf("%.0f%%", percentage)
 }
 
 func secondsLeft(resetsAt *float64) (int, bool) {

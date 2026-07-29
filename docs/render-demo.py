@@ -111,15 +111,9 @@ def build_writer() -> pathlib.Path:
 
 
 def render(binary: pathlib.Path, payload: dict) -> str:
-    """Гоняем состояние через writer с временным HOME — свой снапшот не трогаем."""
-    home = pathlib.Path(tempfile.mkdtemp())
-    (home / ".claude").mkdir()
-
     result = subprocess.run(
-        [str(binary)], input=json.dumps(payload),
-        capture_output=True, text=True, env={"HOME": str(home)},
+        [str(binary)], input=json.dumps(payload), capture_output=True, text=True,
     )
-    shutil.rmtree(home, ignore_errors=True)
     return result.stdout.rstrip("\n")
 
 
@@ -160,7 +154,7 @@ def main() -> None:
         for level in ("low", "medium", "high", "xhigh", "max")
     ]
     efforts.append(("модель без поддержки effort", session(five=42, week=57, left=2 * 3600 + 30 * 60)))
-    sections.append(("Уровень reasoning effort — цвет имени модели", efforts))
+    sections.append(("Уровень reasoning effort — рядом с моделью", efforts))
 
     edges = [
         ("окно уже сброшено — счётчика нет", session(effort="high", five=64, week=71)),
