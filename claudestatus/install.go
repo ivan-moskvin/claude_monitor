@@ -8,14 +8,18 @@ import (
 	"path/filepath"
 )
 
-// install прописывает эту команду в statusLine ~/.claude/settings.json.
-// Путь берём абсолютный: строка статуса вызывается из любого каталога.
-func install() error {
+// installSelf прописывает в настройки бинарь, который сейчас выполняется.
+func installSelf() error {
 	exe, err := selfPath()
 	if err != nil {
 		return err
 	}
+	return install(exe)
+}
 
+// install прописывает команду exe в statusLine ~/.claude/settings.json.
+// Путь берём абсолютный: строка статуса вызывается из любого каталога.
+func install(exe string) error {
 	path, err := settingsPath()
 	if err != nil {
 		return err
@@ -63,7 +67,22 @@ func install() error {
 	}
 
 	fmt.Printf("Строка статуса прописана в %s\n", path)
+	warnIfNotInPath(exe)
 	return nil
+}
+
+// warnIfNotInPath. Claude Code зовёт бинарь по абсолютному пути и без PATH
+// обойдётся, а вот сам пользователь набирает claudestatus руками — go install
+// же кладёт бинарь туда, где PATH бывает не у всех.
+func warnIfNotInPath(exe string) {
+	dir := filepath.Dir(exe)
+	for _, entry := range filepath.SplitList(os.Getenv("PATH")) {
+		if entry == dir {
+			return
+		}
+	}
+	fmt.Printf("\nКаталог %s не в PATH — команда claudestatus не найдётся.\n", dir)
+	fmt.Printf("Строка для ~/.zshrc:  export PATH=\"%s:$PATH\"\n", dir)
 }
 
 func settingsPath() (string, error) {

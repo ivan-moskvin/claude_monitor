@@ -102,35 +102,36 @@ def ansi_to_html(line: str) -> str:
     return "".join(chunks)
 
 
-def build_writer(pending_tag: str | None = None) -> pathlib.Path:
-    """Собирает бинарь в поддельном клоне: строке статуса хватает .git рядом.
+def build_writer(pending_tag: str | None = None) -> tuple[pathlib.Path, pathlib.Path]:
+    """Собирает бинарь версии v1.0.0 и отдаёт его вместе с домашним каталогом.
 
-    С pending_tag рядом кладётся готовый кэш проверки — так рисуется состояние
-    «вышло обновление», без единого запроса в сеть.
+    С pending_tag в кэш этого дома кладётся готовый результат проверки — так
+    рисуется состояние «вышла новая версия», без единого запроса в сеть.
     """
-    root = pathlib.Path(tempfile.mkdtemp())
-    (root / ".git").mkdir()
-    (root / "bin").mkdir()
-
-    binary = root / "bin" / "claudestatus"
+    home = pathlib.Path(tempfile.mkdtemp())
+    binary = home / "claudestatus"
     subprocess.run(
-        ["go", "build", "-ldflags", "-X main.version=v1.0.0", "-o", str(binary), "."],
-        cwd=ROOT / "claudestatus", check=True,
+        ["go", "build", "-ldflags", "-X main.versionOverride=v1.0.0", "-o", str(binary), "./claudestatus"],
+        cwd=ROOT, check=True,
     )
 
     if pending_tag:
-        (root / "bin" / "update-check.json").write_text(
+        # Путь кэша macOS: скрипт и так рисует картинку тамошним Chrome.
+        cache = home / "Library" / "Caches" / "claudestatus"
+        cache.mkdir(parents=True)
+        (cache / "update.json").write_text(
             json.dumps({"checked_at": int(time.time()), "latest": pending_tag})
         )
 
-    return binary
+    return binary, home
 
 
-def render(binary: pathlib.Path, payload: dict) -> str:
+def render(writer: tuple[pathlib.Path, pathlib.Path], payload: dict) -> str:
+    binary, home = writer
     result = subprocess.run(
         [str(binary)], input=json.dumps(payload), capture_output=True, text=True,
-        # Фоновая проверка на каждый рендер ни к чему: теги здесь и так заданы.
-        env={**os.environ, "CLAUDESTATUS_NO_AUTO_UPDATE": "1"},
+        # Фоновая проверка на каждый рендер ни к чему: версии здесь заданы руками.
+        env={**os.environ, "HOME": str(home), "CLAUDESTATUS_NO_AUTO_UPDATE": "1"},
     )
     return result.stdout.rstrip("\n")
 
@@ -182,7 +183,7 @@ def main() -> None:
     sections.append(("Крайние случаи", edges))
 
     pending = build_writer(pending_tag="v1.0.1")
-    sections.append(("Вышел новый тег — обновиться командой claudestatus update", [
+    sections.append(("Вышла новая версия — обновиться командой claudestatus update", [
         ("установлено v1.0.0", session(effort="high", five=42, week=57, left=2 * 3600 + 30 * 60), pending),
     ]))
 
