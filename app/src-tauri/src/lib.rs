@@ -80,7 +80,7 @@ fn refresh_tray<R: Runtime>(app: &tauri::AppHandle<R>) {
     let five = data.window("five_hour");
 
     let progress = five.map(|w| (w.used_percentage / 100.0) as f32);
-    let level = five.map_or(snapshot::Level::Expired, |w| w.level);
+    let level = five.map_or(snapshot::Level::Unknown, |w| w.level);
 
     if let Some(tray) = app.tray_by_id(TRAY_ID) {
         let pixels = ring::menu_bar_icon(progress, level);
@@ -90,6 +90,35 @@ fn refresh_tray<R: Runtime>(app: &tauri::AppHandle<R>) {
     }
 
     let _ = app.emit("snapshot", data);
+}
+
+/// Зазор между строкой меню и попапом, как у системных меню.
+const POPUP_GAP: f64 = 6.0;
+/// Минимальный отступ от края экрана — иначе окно упирается в угол.
+const SCREEN_MARGIN: f64 = 8.0;
+
+/// Отодвигает попап от строки меню и не даёт ему уехать за край экрана:
+/// у иконки трея справа окно иначе вылезает за границу.
+fn offset_below_menu_bar<R: Runtime>(window: &tauri::WebviewWindow<R>) {
+    let (Ok(Some(monitor)), Ok(mut position), Ok(size)) = (
+        window.current_monitor(),
+        window.outer_position(),
+        window.outer_size(),
+    ) else {
+        return;
+    };
+
+    let scale = monitor.scale_factor();
+    let screen = monitor.position();
+    let screen_size = monitor.size();
+
+    position.y += (POPUP_GAP * scale) as i32;
+
+    let margin = (SCREEN_MARGIN * scale) as i32;
+    let right_edge = screen.x + screen_size.width as i32 - size.width as i32 - margin;
+    position.x = position.x.clamp(screen.x + margin, right_edge.max(screen.x + margin));
+
+    let _ = window.set_position(position);
 }
 
 fn toggle_popup<R: Runtime>(app: &tauri::AppHandle<R>) {
@@ -103,10 +132,13 @@ fn toggle_popup<R: Runtime>(app: &tauri::AppHandle<R>) {
     }
 
     // Позиционируем под иконкой трея — окно без декораций само этого не умеет.
+    // Именно BottomCenter: TrayCenter центрирует окно по иконке и заезжает
+    // под строку меню.
     let _ = tauri_plugin_positioner::WindowExt::move_window(
         &window,
-        tauri_plugin_positioner::Position::TrayCenter,
+        tauri_plugin_positioner::Position::TrayBottomCenter,
     );
+    offset_below_menu_bar(&window);
     let _ = window.show();
     let _ = window.set_focus();
 }
@@ -135,7 +167,7 @@ pub fn run() {
 
             TrayIconBuilder::with_id(TRAY_ID)
                 .icon(Image::new_owned(
-                    ring::menu_bar_icon(None, snapshot::Level::Expired),
+                    ring::menu_bar_icon(None, snapshot::Level::Unknown),
                     ring::ICON_SIZE,
                     ring::ICON_SIZE,
                 ))

@@ -22,7 +22,7 @@ pub enum Level {
     Ok,
     Warn,
     Critical,
-    Expired,
+    Unknown,
 }
 
 #[derive(Serialize, Clone)]
@@ -97,13 +97,18 @@ pub fn read() -> Snapshot {
                 _ => None,
             };
 
+            // Окно сбросилось — прежние проценты описывают прошлое окно.
+            // Расход в новом окне начинается с нуля, показывать старое число
+            // как текущее нельзя: оно пугает цифрами, которых уже нет.
+            let used = if expired { 0.0 } else { used };
+
             Some(Window {
                 id: (*key).to_string(),
                 title: (*title).to_string(),
                 used_percentage: used,
                 seconds_left,
                 expired,
-                level: level_for(used, expired),
+                level: level_for(used),
             })
         })
         .collect();
@@ -123,10 +128,8 @@ pub fn read() -> Snapshot {
 }
 
 /// Пороги цвета — единственное место на весь проект.
-fn level_for(used: f64, expired: bool) -> Level {
-    if expired {
-        Level::Expired
-    } else if used < 60.0 {
+fn level_for(used: f64) -> Level {
+    if used < 60.0 {
         Level::Ok
     } else if used < 85.0 {
         Level::Warn

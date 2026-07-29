@@ -32,7 +32,6 @@ const ui = {
 let state = { snapshot: null, receivedAt: Date.now() };
 
 function color(window) {
-  if (window.level === "expired") return "var(--muted)";
   if (window.level === "warn") return "var(--warn)";
   if (window.level === "critical") return "var(--critical)";
   return RING_COLORS[window.id] ?? "var(--ok)";
@@ -83,7 +82,6 @@ function drawArc(element, window) {
   element.style.strokeDasharray = String(circumference);
   element.style.strokeDashoffset = String(circumference * (1 - progress));
   element.style.stroke = window ? color(window) : "transparent";
-  element.style.opacity = window && window.expired ? "0.45" : "1";
 }
 
 function render() {
@@ -115,7 +113,6 @@ function render() {
         .filter((w) => w.id !== "seven_day_opus")
         .map((w) => {
           const item = document.createElement("li");
-          item.classList.toggle("expired", w.expired);
 
           const dot = document.createElement("span");
           dot.className = "dot";
