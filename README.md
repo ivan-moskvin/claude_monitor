@@ -6,6 +6,8 @@
 
 ## Установка
 
+macOS и Linux:
+
 ```bash
 curl -fsSL https://raw.githubusercontent.com/ivan-moskvin/claude_monitor/main/install.sh | sh
 ```
