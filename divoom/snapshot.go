@@ -15,7 +15,9 @@ const staleAfter = 90 * time.Second
 type snapshot struct {
 	windows map[string]usageWindow
 	stale   bool
-	err     string
+	// Возраст снапшота; показываем его, когда данные перестали обновляться.
+	age time.Duration
+	err string
 }
 
 type usageWindow struct {
@@ -84,7 +86,8 @@ func readSnapshot() snapshot {
 
 	result := snapshot{windows: windows}
 	if updated, err := time.Parse(time.RFC3339, raw.UpdatedAt); err == nil {
-		result.stale = time.Since(updated) >= staleAfter
+		result.age = time.Since(updated)
+		result.stale = result.age >= staleAfter
 	}
 	return result
 }
