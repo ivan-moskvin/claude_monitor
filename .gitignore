@@ -1,5 +1,8 @@
-.build/
-build/
 .DS_Store
-*.xcuserstate
 .idea/
+
+# Rust / Tauri
+app/src-tauri/target/
+app/src-tauri/gen/
+app/node_modules/
+
