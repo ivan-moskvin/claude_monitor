@@ -43,12 +43,6 @@ var effortColors = map[string]int{
 	"max":    199,
 }
 
-// config — настройки виджета. Файла может не быть: по умолчанию строка
-// чёрно-белая, цвет включается тумблером в попапе.
-type config struct {
-	StatuslineColor bool `json:"statusline_color"`
-}
-
 type sessionInput struct {
 	RateLimits map[string]json.RawMessage `json:"rate_limits"`
 	Model      struct {
@@ -86,12 +80,10 @@ func main() {
 		})
 	}
 
-	colorful := readConfig().StatuslineColor
-
 	var parts []string
 
 	if name := input.Model.DisplayName; name != "" {
-		if color, ok := effortColors[input.Effort.Level]; ok && colorful {
+		if color, ok := effortColors[input.Effort.Level]; ok {
 			name = colorized(name, color)
 		}
 		parts = append(parts, name)
@@ -101,17 +93,19 @@ func main() {
 
 	if five.UsedPercentage != nil {
 		used := *five.UsedPercentage
-		parts = append(parts, fmt.Sprintf("5h %s", labeledBar(used, percentLabel(used), usageColor(used), colorful)))
-	}
-
-	if week := parseWindow(input.RateLimits["seven_day"]); week.UsedPercentage != nil {
-		used := *week.UsedPercentage
-		parts = append(parts, fmt.Sprintf("7d %s", labeledBar(used, percentLabel(used), usageColor(used), colorful)))
+		parts = append(parts, fmt.Sprintf("5h %s", labeledBar(used, percentLabel(used), usageColor(used))))
 	}
 
 	if left, ok := secondsLeft(five.ResetsAt); ok {
 		elapsed := float64(fiveHourSeconds-left) / fiveHourSeconds * 100
-		parts = append(parts, fmt.Sprintf("сброс %s", labeledBar(elapsed, countdown(left), colorCyan, colorful)))
+		parts = append(parts, fmt.Sprintf("сброс %s", labeledBar(elapsed, countdown(left), colorCyan)))
+	}
+
+	// Недельное окно уходит в конец: оно меняется медленно и мешает
+	// читать то, что важно прямо сейчас.
+	if week := parseWindow(input.RateLimits["seven_day"]); week.UsedPercentage != nil {
+		used := *week.UsedPercentage
+		parts = append(parts, fmt.Sprintf("7d %s", labeledBar(used, percentLabel(used), usageColor(used))))
 	}
 
 	if len(parts) == 0 {
@@ -121,12 +115,10 @@ func main() {
 	fmt.Println(strings.Join(parts, " · "))
 }
 
-// labeledBar рисует полосу, внутри которой по центру написан label.
-//
-// В цветном режиме фон идёт на всю ширину — залитая часть цветом уровня,
-// остаток тёмно-серым, — поэтому граница полосы читается сама. В чёрно-белом
-// цвета нет вовсе, поэтому заливка показана инверсией, а края — рамкой.
-func labeledBar(percentage float64, label string, color int, colorful bool) string {
+// labeledBar рисует полосу, внутри которой по центру написан label. Фон идёт
+// на всю ширину — залитая часть цветом уровня, остаток тёмно-серым, — поэтому
+// граница полосы читается без рамки.
+func labeledBar(percentage float64, label string, color int) string {
 	runes := []rune(label)
 	if len(runes) > barWidth {
 		runes = runes[:barWidth]
@@ -138,12 +130,6 @@ func labeledBar(percentage float64, label string, color int, colorful bool) stri
 	filled := int(math.RoundToEven(percentage / 100 * barWidth))
 	filled = max(0, min(barWidth, filled))
 
-	if !colorful {
-		body := fmt.Sprintf("\x1b[7m%s\x1b[27m\x1b[2m%s\x1b[22m",
-			string(text[:filled]), string(text[filled:]))
-		return fmt.Sprintf("\x1b[2m▕\x1b[22m%s\x1b[2m▏\x1b[22m", body)
-	}
-
 	textColor := colorDarkText
 	if color == colorRed {
 		textColor = colorLightText
@@ -152,25 +138,6 @@ func labeledBar(percentage float64, label string, color int, colorful bool) stri
 	return fmt.Sprintf("\x1b[1;48;5;%d;38;5;%dm%s\x1b[0;48;5;%d;38;5;%dm%s\x1b[0m",
 		color, textColor, string(text[:filled]),
 		colorEmptyBG, colorEmptyFG, string(text[filled:]))
-}
-
-// readConfig читает настройки виджета. Любая проблема с файлом — не повод
-// ломать строку статуса: возвращаем значения по умолчанию.
-func readConfig() config {
-	var cfg config
-
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return cfg
-	}
-
-	data, err := os.ReadFile(filepath.Join(home, ".claude", "claude-monitor.json"))
-	if err != nil {
-		return cfg
-	}
-
-	_ = json.Unmarshal(data, &cfg)
-	return cfg
 }
 
 func usageColor(percentage float64) int {
