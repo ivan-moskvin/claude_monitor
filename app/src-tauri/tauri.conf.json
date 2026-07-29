@@ -1,0 +1,49 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "ClaudeUsageBar",
+  "version": "1.0.0",
+  "identifier": "pro.moskwin.claudeusagebar",
+  "build": {
+    "frontendDist": "../src"
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "macOSPrivateApi": true,
+    "windows": [
+      {
+        "label": "popup",
+        "title": "Claude Limit",
+        "width": 260,
+        "height": 430,
+        "resizable": false,
+        "decorations": false,
+        "transparent": true,
+        "shadow": true,
+        "visible": false,
+        "skipTaskbar": true,
+        "alwaysOnTop": true,
+        "focus": true
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "copyright": "Ivan Moskvin",
+    "category": "DeveloperTool",
+    "shortDescription": "Мониторинг лимитов Claude",
+    "longDescription": "Виджет в строке меню: расход 5-часового и недельного окон Claude Code.",
+    "macOS": {
+      "minimumSystemVersion": "10.15"
+    }
+  }
+}
