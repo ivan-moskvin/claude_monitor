@@ -20,6 +20,13 @@ type config struct {
 	LcdIndex int `json:"lcd_index"`
 	// Порт локального сервера с кадрами; фиксированный, см. assets.
 	Port int `json:"port"`
+	// Идентификатор устройства в облаке Divoom — по нему узнаётся раскладка экранов.
+	DeviceID int `json:"device_id,omitempty"`
+	// Что было на нашем экране до нас: циферблат и набор экранов, которому он
+	// принадлежит. Запоминаем при первом запуске и возвращаем при удалении —
+	// иначе после ухода моста экран останется с мёртвой картинкой.
+	PrevClockID      int `json:"prev_clock_id,omitempty"`
+	PrevIndependence int `json:"prev_independence,omitempty"`
 }
 
 func configPath() (string, error) {
