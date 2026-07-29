@@ -1,11 +1,12 @@
-// Команда claude-statusline — writer в связке claude_monitor.
+// Команда claude-statusline — строка статуса с лимитами Claude.
 //
 // Claude Code вызывает её как statusLine-команду: подаёт JSON сессии на stdin,
-// забирает строку статуса из stdout. Попутно команда сохраняет лимиты
-// в ~/.claude/usage-snapshot.json — единственный контракт с виджетом.
+// забирает строку статуса из stdout. С ключом --install команда прописывает
+// себя в ~/.claude/settings.json.
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"math"
@@ -59,25 +60,23 @@ type window struct {
 	ResetsAt       *float64 `json:"resets_at"`
 }
 
-type snapshot struct {
-	RateLimits map[string]json.RawMessage `json:"rate_limits"`
-	UpdatedAt  string                     `json:"updated_at"`
-}
-
 func main() {
+	if len(os.Args) > 1 {
+		if os.Args[1] != "--install" {
+			fmt.Fprintf(os.Stderr, "Неизвестный аргумент: %s (есть только --install)\n", os.Args[1])
+			os.Exit(2)
+		}
+		if err := install(); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		return
+	}
+
 	var input sessionInput
 	if err := json.NewDecoder(os.Stdin).Decode(&input); err != nil {
 		fmt.Println("—")
 		return
-	}
-
-	if len(input.RateLimits) > 0 {
-		// Ошибку записи глотаем намеренно: строка статуса важнее снапшота
-		// и не должна пропадать из-за проблем с диском.
-		_ = writeSnapshot(snapshot{
-			RateLimits: input.RateLimits,
-			UpdatedAt:  time.Now().UTC().Format("2006-01-02T15:04:05.000000-07:00"),
-		})
 	}
 
 	var parts []string
@@ -184,8 +183,7 @@ func countdown(seconds int) string {
 	return fmt.Sprintf("%dм", minutes)
 }
 
-// normalizeEpoch принимает Unix-время в секундах или миллисекундах —
-// та же эвристика, что и у читателя снапшота.
+// normalizeEpoch принимает Unix-время в секундах или миллисекундах.
 func normalizeEpoch(value float64) float64 {
 	if value > 1e12 {
 		return value / 1000
@@ -201,27 +199,60 @@ func parseWindow(raw json.RawMessage) window {
 	return w
 }
 
-func writeSnapshot(payload snapshot) error {
+// install прописывает эту команду в statusLine ~/.claude/settings.json.
+// Путь берём абсолютный: строка статуса вызывается из любого каталога.
+func install() error {
+	exe, err := os.Executable()
+	if err != nil {
+		return fmt.Errorf("не удалось определить свой путь: %w", err)
+	}
+	if exe, err = filepath.EvalSymlinks(exe); err != nil {
+		return fmt.Errorf("не удалось определить свой путь: %w", err)
+	}
+
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return err
 	}
-
 	dir := filepath.Join(home, ".claude")
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return err
+	path := filepath.Join(dir, "settings.json")
+
+	settings := map[string]any{}
+	data, err := os.ReadFile(path)
+	switch {
+	case err == nil:
+		if len(bytes.TrimSpace(data)) > 0 {
+			if json.Unmarshal(data, &settings) != nil {
+				return fmt.Errorf("%s не разбирается — поправьте его вручную", path)
+			}
+		}
+		// Бэкап до записи и только при существующем файле —
+		// иначе затрём чужие настройки без возможности откатиться.
+		if err := os.WriteFile(path+".bak", data, 0o644); err != nil {
+			return fmt.Errorf("не удалось сделать бэкап settings.json: %w", err)
+		}
+	case !os.IsNotExist(err):
+		return fmt.Errorf("не удалось прочитать settings.json: %w", err)
 	}
 
-	data, err := json.Marshal(payload)
+	// Кавычки — на случай пробелов в пути к репозиторию.
+	command := fmt.Sprintf("%q", exe)
+	if previous, ok := settings["statusLine"].(map[string]any); ok {
+		if was, _ := previous["command"].(string); was != "" && was != command {
+			fmt.Printf("Заменяю прежнюю строку статуса: %s\n", was)
+			fmt.Printf("Прежние настройки — в %s.bak\n", path)
+		}
+	}
+
+	settings["statusLine"] = map[string]string{"type": "command", "command": command}
+
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return fmt.Errorf("не удалось создать %s: %w", dir, err)
+	}
+
+	updated, err := json.MarshalIndent(settings, "", "  ")
 	if err != nil {
 		return err
 	}
-
-	// Пишем через временный файл: виджет читает снапшот параллельно
-	// и не должен наткнуться на половину записи.
-	tmp := filepath.Join(dir, "usage-snapshot.tmp")
-	if err := os.WriteFile(tmp, data, 0o644); err != nil {
-		return err
-	}
-	return os.Rename(tmp, filepath.Join(dir, "usage-snapshot.json"))
+	return os.WriteFile(path, append(updated, '\n'), 0o644)
 }

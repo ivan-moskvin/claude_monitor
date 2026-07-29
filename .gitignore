@@ -1,8 +1,4 @@
 .DS_Store
 .idea/
 
-# Rust / Tauri
-app/src-tauri/target/
-app/src-tauri/gen/
-app/node_modules/
-
+bin/

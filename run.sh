@@ -1,47 +1,67 @@
 #!/usr/bin/env bash
-# Собирает виджет из исходников и перезапускает его.
-# Приложение работает прямо из репозитория: никакой установки в систему нет.
+# Собирает строку статуса из исходников и прописывает её в Claude Code.
+# Бинарь живёт прямо в репозитории: никакой установки в систему нет.
 set -euo pipefail
 
 cd "$(dirname "$0")"
 ROOT="$PWD"
-TARGET="$ROOT/app/src-tauri/target/release"
+BINARY="$ROOT/bin/claude-statusline"
 
-# Rust на macOS обычно ставят keg-only rustup или rustup-init — оба каталога
-# в PATH неинтерактивной оболочки не попадают.
-export PATH="/opt/homebrew/opt/rustup/bin:$HOME/.cargo/bin:$PATH"
+ASSUME_YES=0
+case "${1:-}" in
+    -y|--yes) ASSUME_YES=1 ;;
+    "") ;;
+    *) echo "Неизвестный аргумент: $1 (есть только --yes)" >&2; exit 2 ;;
+esac
 
-missing=()
+export PATH="/opt/homebrew/bin:$PATH"
+
 have() { command -v "$1" >/dev/null 2>&1; }
-have go || missing+=("go     — brew install go")
-have node || missing+=("node   — brew install node")
-have cargo || missing+=("rust   — brew install rustup && rustup default stable")
 
-if [ ${#missing[@]} -gt 0 ]; then
-    echo "Не хватает инструментов:" >&2
-    printf '  %s\n' "${missing[@]}" >&2
-    exit 1
-fi
+# Go ставим сами: руками остаётся только Homebrew, если его нет.
+ensure_go() {
+    have go && return
 
-echo "==> Writer"
-# Кладём рядом с бинарём: вне бандла Tauri ищет ресурсы в каталоге исполняемого файла.
-mkdir -p "$TARGET/resources"
-rm -f "$TARGET/resources/claude-statusline"
-(cd statusline && go build -trimpath -ldflags="-s -w" -o "$TARGET/resources/claude-statusline" .)
+    echo "Не хватает: go"
 
-echo "==> Виджет"
-[ -d app/node_modules ] || (cd app && npm ci)
-(cd app && npx tauri build --no-bundle)
+    if ! have brew; then
+        echo "Сначала нужен Homebrew — дальше скрипт всё поставит сам:" >&2
+        echo '  /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/brew/HEAD/install.sh)"' >&2
+        exit 1
+    fi
 
-BINARY="$TARGET/claude-usage-bar"
-[ -x "$BINARY" ] || { echo "Бинарь не собрался: $BINARY" >&2; exit 1; }
+    if [ "$ASSUME_YES" != 1 ]; then
+        if [ ! -t 0 ]; then
+            echo "Нет терминала для вопроса — запустите с --yes." >&2
+            exit 1
+        fi
+        # Пустой ответ — это Enter, а вот EOF (Ctrl-D) читается как отказ.
+        if ! read -r -p "Поставить через brew? [Y/n] " answer; then
+            echo >&2
+            echo "Отменено." >&2
+            exit 1
+        fi
+        case "$answer" in
+            ""|y|Y|yes|Yes|да) ;;
+            *) echo "Отменено." >&2; exit 1 ;;
+        esac
+    fi
 
-echo "==> Запуск"
-pkill -x claude-usage-bar 2>/dev/null || true
-sleep 0.3
-nohup "$BINARY" >/dev/null 2>&1 &
-disown
+    echo "==> Устанавливаю go"
+    brew install go
+
+    hash -r
+    have go || { echo "go не нашёлся и после установки — откройте новый терминал и повторите." >&2; exit 1; }
+}
+
+ensure_go
+
+echo "==> Сборка"
+mkdir -p "$ROOT/bin"
+(cd statusline && go build -trimpath -ldflags="-s -w" -o "$BINARY" .)
+
+echo "==> Установка"
+"$BINARY" --install
 
 echo
-echo "Виджет в строке меню. Автозапуск и строку статуса включите в попапе."
-echo "Остановить: pkill -x claude-usage-bar"
+echo "Готово. Строка статуса появится в следующей сессии Claude Code."
