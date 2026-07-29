@@ -24,8 +24,6 @@ irm https://raw.githubusercontent.com/ivan-moskvin/claude_monitor/main/install.p
 claudestatus update
 ```
 
-Новая версия подсвечивается в конце строки.
-
 Отключить проверку: `CLAUDESTATUS_NO_AUTO_UPDATE=1`.
 
 ## Удаление
