@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-	"syscall"
 	"time"
 )
 
@@ -54,9 +53,7 @@ func EnsureRunning() {
 	}
 	cmd := exec.Command(exe, "divoom")
 	cmd.Stdin, cmd.Stdout, cmd.Stderr = nil, nil, nil
-	// Отвязываем от группы процессов Claude Code: иначе мост умрёт вместе с
-	// вызовом строки статуса, ради которого его и подняли.
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
+	cmd.SysProcAttr = detachAttrs()
 	_ = cmd.Start()
 	if cmd.Process != nil {
 		_ = cmd.Process.Release()
@@ -77,8 +74,7 @@ func running() bool {
 	if err != nil || pid <= 0 {
 		return false
 	}
-	// Сигнал 0 ничего не делает процессу, но отвечает, существует ли он.
-	return syscall.Kill(pid, 0) == nil
+	return processAlive(pid)
 }
 
 func takeLock() error {
@@ -96,6 +92,54 @@ func dropLock() {
 	if path, err := lockPath(); err == nil {
 		_ = os.Remove(path)
 	}
+}
+
+// Stop останавливает мост и убирает за ним. Зовётся из `claudestatus uninstall`:
+// без этого мост переживает удаление бинаря, а экран устройства остаётся с
+// панелью и уходит в вечную загрузку, когда мост всё-таки умрёт.
+func Stop() {
+	path, err := lockPath()
+	if err != nil {
+		return
+	}
+
+	if data, err := os.ReadFile(path); err == nil {
+		if pid, err := strconv.Atoi(strings.TrimSpace(string(data))); err == nil && pid > 0 {
+			// Где есть сигналы, мост возвращает экран сам; где нет — и там,
+			// где не успел, — возвращаем за него.
+			_ = terminate(pid)
+			for i := 0; i < 30 && processAlive(pid); i++ {
+				time.Sleep(100 * time.Millisecond)
+			}
+			if processAlive(pid) {
+				_ = forceKill(pid)
+			}
+			if !gracefulStop || processAlive(pid) {
+				restore()
+			}
+			fmt.Println("Остановлен мост Divoom")
+		}
+	}
+	_ = os.Remove(path)
+
+	// Конфиг с токеном устройства — тоже наше состояние, при удалении уходит.
+	if cfgPath, err := configPath(); err == nil {
+		if err := os.Remove(cfgPath); err == nil {
+			fmt.Printf("Удалён %s\n", cfgPath)
+		}
+	}
+}
+
+// restore возвращает экрану прежний циферблат по сохранённым в конфиге
+// значениям. Молчит: при удалении устройство может быть выключено, и это не
+// повод ронять uninstall.
+func restore() {
+	cfg, err := loadConfig()
+	if err != nil || cfg.IP == "" || cfg.PrevClockID == 0 {
+		return
+	}
+	target := device{ip: cfg.IP, token: cfg.LocalToken, lcd: cfg.LcdIndex}
+	_ = target.restoreScreen(cfg.PrevClockID, cfg.PrevIndependence)
 }
 
 // reachable — отвечает ли устройство на своём порту. Полноценную команду не
