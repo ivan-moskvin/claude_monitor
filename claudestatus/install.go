@@ -4,13 +4,15 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/ivan-moskvin/claude_monitor/divoom"
-	"github.com/ivan-moskvin/claude_monitor/paths"
 	"os"
 	"path/filepath"
+
+	"github.com/ivan-moskvin/claude_monitor/divoom"
+	"github.com/ivan-moskvin/claude_monitor/i18n"
+	"github.com/ivan-moskvin/claude_monitor/paths"
 )
 
-// installSelf прописывает в настройки бинарь, который сейчас выполняется.
+// installSelf registers the binary that is running right now.
 func installSelf() error {
 	exe, err := selfPath()
 	if err != nil {
@@ -19,8 +21,8 @@ func installSelf() error {
 	return install(exe)
 }
 
-// install прописывает команду exe в statusLine ~/.claude/settings.json.
-// Путь берём абсолютный: строка статуса вызывается из любого каталога.
+// install writes the exe command into statusLine of ~/.claude/settings.json.
+// The path is absolute: the status line is invoked from any directory.
 func install(exe string) error {
 	path, err := settingsPath()
 	if err != nil {
@@ -33,31 +35,31 @@ func install(exe string) error {
 	case err == nil:
 		if len(bytes.TrimSpace(data)) > 0 {
 			if json.Unmarshal(data, &settings) != nil {
-				return fmt.Errorf("%s не разбирается — поправьте его вручную", path)
+				return fmt.Errorf(i18n.T("%s does not parse — fix it by hand"), path)
 			}
 		}
-		// Бэкап до записи и только при существующем файле —
-		// иначе затрём чужие настройки без возможности откатиться.
+		// Back up before writing and only when the file exists — otherwise we
+		// would overwrite somebody's settings with no way back.
 		if err := os.WriteFile(path+".bak", data, 0o644); err != nil {
-			return fmt.Errorf("не удалось сделать бэкап settings.json: %w", err)
+			return fmt.Errorf(i18n.T("could not back up settings.json: %w"), err)
 		}
 	case !os.IsNotExist(err):
-		return fmt.Errorf("не удалось прочитать settings.json: %w", err)
+		return fmt.Errorf(i18n.T("could not read settings.json: %w"), err)
 	}
 
-	// Кавычки — на случай пробелов в пути к репозиторию.
+	// Quoted, in case the path to the repository has spaces in it.
 	command := fmt.Sprintf("%q", exe)
 	if previous, ok := settings["statusLine"].(map[string]any); ok {
 		if was, _ := previous["command"].(string); was != "" && was != command {
-			fmt.Printf("Заменяю прежнюю строку статуса: %s\n", was)
-			fmt.Printf("Прежние настройки — в %s.bak\n", path)
+			fmt.Printf(i18n.T("Replacing the previous status line: %s\n"), was)
+			fmt.Printf(i18n.T("The previous settings are in %s.bak\n"), path)
 		}
 	}
 
 	settings["statusLine"] = map[string]string{"type": "command", "command": command}
 
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return fmt.Errorf("не удалось создать %s: %w", filepath.Dir(path), err)
+		return fmt.Errorf(i18n.T("could not create %s: %w"), filepath.Dir(path), err)
 	}
 
 	updated, err := json.MarshalIndent(settings, "", "  ")
@@ -68,14 +70,14 @@ func install(exe string) error {
 		return err
 	}
 
-	fmt.Printf("Строка статуса прописана в %s\n", path)
+	fmt.Printf(i18n.T("Status line registered in %s\n"), path)
 	warnIfNotInPath(exe)
 	return nil
 }
 
-// warnIfNotInPath. Claude Code зовёт бинарь по абсолютному пути и без PATH
-// обойдётся, а вот сам пользователь набирает claudestatus руками — go install
-// же кладёт бинарь туда, где PATH бывает не у всех.
+// warnIfNotInPath. Claude Code calls the binary by its absolute path and does
+// fine without PATH, but the user types claudestatus by hand — and go install
+// drops the binary where not everybody has a PATH entry.
 func warnIfNotInPath(exe string) {
 	dir := filepath.Dir(exe)
 	for _, entry := range filepath.SplitList(os.Getenv("PATH")) {
@@ -83,12 +85,13 @@ func warnIfNotInPath(exe string) {
 			return
 		}
 	}
-	fmt.Printf("\nКаталог %s не в PATH — команда claudestatus не найдётся.\n", dir)
-	fmt.Printf("Строка для ~/.zshrc:  export PATH=\"%s:$PATH\"\n", dir)
+	fmt.Printf(i18n.T("\n%s is not in PATH — the claudestatus command will not be found.\n"), dir)
+	fmt.Printf(i18n.T("Line for ~/.zshrc:  export PATH=\"%s:$PATH\"\n"), dir)
 }
 
-// uninstall убирает за собой всё: запись в настройках, кэш проверок и бинарь.
-// Порядок важен — сначала настройки, иначе Claude Code успеет позвать удалённый файл.
+// uninstall clears everything behind us: the settings entry, the check cache
+// and the binary. The order matters — settings first, or Claude Code manages to
+// call an already deleted file.
 func uninstall() error {
 	exe, err := selfPath()
 	if err != nil {
@@ -99,34 +102,36 @@ func uninstall() error {
 		return err
 	}
 
-	// Мост живёт отдельным процессом и переживёт удаление бинаря, если его не
-	// остановить: панель на устройстве останется, а обновлять её будет некому.
+	// The bridge is a separate process and outlives the deleted binary unless
+	// it is stopped: the panel stays on the device with nobody left to update
+	// it.
 	divoom.Stop()
 
-	// Каталог приложения целиком: снимок лимитов, настройки моста, pid-файл.
+	// The whole application directory: usage snapshot, bridge settings, pid file.
 	if dir, err := paths.Dir(); err == nil {
 		if err := os.RemoveAll(dir); err == nil {
-			fmt.Printf("Удалён %s\n", dir)
+			fmt.Printf(i18n.T("Removed %s\n"), dir)
 		}
 	}
 
 	if dir, err := cacheDir(); err == nil {
 		if err := os.RemoveAll(dir); err == nil {
-			fmt.Printf("Удалён кэш %s\n", dir)
+			fmt.Printf(i18n.T("Removed the cache %s\n"), dir)
 		}
 	}
 
-	// Запущенный бинарь удаляется на месте везде, кроме Windows.
+	// A running binary can be deleted in place everywhere but on Windows.
 	if err := os.Remove(exe); err != nil {
-		fmt.Printf("Бинарь остался — удалите вручную: %s\n", exe)
+		fmt.Printf(i18n.T("The binary is still there — remove it by hand: %s\n"), exe)
 		return nil
 	}
-	fmt.Printf("Удалён бинарь %s\n", exe)
+	fmt.Printf(i18n.T("Removed the binary %s\n"), exe)
 	return nil
 }
 
-// removeFromSettings вынимает из settings.json нашу строку статуса. Чужую
-// не трогаем: заменить её было решением пользователя, а вернуть нам нечего.
+// removeFromSettings takes our status line out of settings.json. Somebody
+// else's is left alone: replacing it was the user's decision, and we have
+// nothing to put back.
 func removeFromSettings(exe string) error {
 	path, err := settingsPath()
 	if err != nil {
@@ -135,32 +140,32 @@ func removeFromSettings(exe string) error {
 
 	data, err := os.ReadFile(path)
 	if os.IsNotExist(err) {
-		fmt.Printf("%s нет — настройки чистить не нужно\n", path)
+		fmt.Printf(i18n.T("There is no %s — nothing to clean in the settings\n"), path)
 		return nil
 	}
 	if err != nil {
-		return fmt.Errorf("не удалось прочитать settings.json: %w", err)
+		return fmt.Errorf(i18n.T("could not read settings.json: %w"), err)
 	}
 
 	settings := map[string]any{}
 	if len(bytes.TrimSpace(data)) > 0 {
 		if json.Unmarshal(data, &settings) != nil {
-			return fmt.Errorf("%s не разбирается — поправьте его вручную", path)
+			return fmt.Errorf(i18n.T("%s does not parse — fix it by hand"), path)
 		}
 	}
 
 	current, ok := settings["statusLine"].(map[string]any)
 	if !ok {
-		fmt.Printf("В %s строки статуса нет\n", path)
+		fmt.Printf(i18n.T("There is no status line in %s\n"), path)
 		return nil
 	}
 	if command, _ := current["command"].(string); command != fmt.Sprintf("%q", exe) {
-		fmt.Printf("В %s прописана не наша строка статуса — оставляю как есть:\n  %s\n", path, command)
+		fmt.Printf(i18n.T("%s holds a status line that is not ours — leaving it as is:\n  %s\n"), path, command)
 		return nil
 	}
 
 	if err := os.WriteFile(path+".bak", data, 0o644); err != nil {
-		return fmt.Errorf("не удалось сделать бэкап settings.json: %w", err)
+		return fmt.Errorf(i18n.T("could not back up settings.json: %w"), err)
 	}
 	delete(settings, "statusLine")
 
@@ -172,7 +177,7 @@ func removeFromSettings(exe string) error {
 		return err
 	}
 
-	fmt.Printf("Строка статуса убрана из %s (прежние настройки — в %s.bak)\n", path, path)
+	fmt.Printf(i18n.T("Status line removed from %s (the previous settings are in %s.bak)\n"), path, path)
 	return nil
 }
 
@@ -184,16 +189,16 @@ func settingsPath() (string, error) {
 	return filepath.Join(home, ".claude", "settings.json"), nil
 }
 
-// selfPath — путь к собственному бинарю с раскрытыми симлинками: команду
-// запускают через ссылку из ~/.local/bin, а обновляться нужно в клоне.
+// selfPath — the path to our own binary with symlinks resolved: the command is
+// run through a link from ~/.local/bin, but it has to update the real file.
 func selfPath() (string, error) {
 	exe, err := os.Executable()
 	if err != nil {
-		return "", fmt.Errorf("не удалось определить свой путь: %w", err)
+		return "", fmt.Errorf(i18n.T("could not determine our own path: %w"), err)
 	}
 	exe, err = filepath.EvalSymlinks(exe)
 	if err != nil {
-		return "", fmt.Errorf("не удалось определить свой путь: %w", err)
+		return "", fmt.Errorf(i18n.T("could not determine our own path: %w"), err)
 	}
 	return exe, nil
 }

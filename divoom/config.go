@@ -2,29 +2,31 @@ package divoom
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 
+	"github.com/ivan-moskvin/claude_monitor/i18n"
 	"github.com/ivan-moskvin/claude_monitor/paths"
 )
 
 const configName = "divoom.json"
 
-// Порт локального сервера с кадрами по умолчанию.
+// The default port of the local server with the frames.
 const defaultPort = 8477
 
 type config struct {
-	// IP устройства. Пустой — ищем в сети заново.
+	// The IP of the device. Empty — look for it on the network again.
 	IP string `json:"ip"`
-	// Экран 0–4, на который отдаём панель. Остальные не трогаем.
+	// Screen 0–4, the one we hand the panel to. The others are left alone.
 	LcdIndex int `json:"lcd_index"`
-	// Порт локального сервера с кадрами; занят — берётся свободный.
+	// The port of the local server with the frames; if taken, a free one is used.
 	Port int `json:"port"`
-	// Идентификатор устройства в облаке Divoom — по нему узнаётся раскладка экранов.
+	// The id of the device in the Divoom cloud — the screen layout is looked up by it.
 	DeviceID int `json:"device_id,omitempty"`
-	// Что было на нашем экране до нас: циферблат и набор экранов, которому он
-	// принадлежит. Запоминаем при первом запуске и возвращаем при удалении —
-	// иначе после ухода моста экран останется с мёртвой картинкой.
+	// What was on our screen before us: the clock face and the set of screens it
+	// belongs to. Remembered on the first run and given back on uninstall —
+	// otherwise the screen is left with a dead picture once the bridge is gone.
 	PrevClockID      int `json:"prev_clock_id,omitempty"`
 	PrevIndependence int `json:"prev_independence,omitempty"`
 }
@@ -44,12 +46,12 @@ func loadConfig() (config, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return cfg, fmt.Errorf("панель не включена — claudestatus divoom on")
+			return cfg, errors.New(i18n.T("the panel is not turned on — claudestatus divoom on"))
 		}
 		return cfg, err
 	}
 	if err := json.Unmarshal(data, &cfg); err != nil {
-		return cfg, fmt.Errorf("%s не разбирается: %w", path, err)
+		return cfg, fmt.Errorf(i18n.T("%s does not parse: %w"), path, err)
 	}
 	if cfg.Port == 0 {
 		cfg.Port = defaultPort

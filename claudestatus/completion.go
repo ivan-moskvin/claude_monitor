@@ -3,11 +3,13 @@ package main
 import (
 	"fmt"
 	"os"
+
+	"github.com/ivan-moskvin/claude_monitor/i18n"
 )
 
-// Автодополнение команд: без него в оболочке всплывают только подсказки из
-// истории, то есть лишь то, что уже набирали руками.
-const completionUsage = `Использование:
+// Command completion: without it the shell only suggests what came out of the
+// history, that is only what has already been typed by hand.
+const completionUsage = `Usage:
   claudestatus completion zsh   >> ~/.zshrc
   claudestatus completion bash  >> ~/.bashrc
 `
@@ -15,29 +17,29 @@ const completionUsage = `Использование:
 const zshCompletion = `_claudestatus() {
   local -a commands
   commands=(
-    'install:прописать себя в настройки Claude Code'
-    'check:проверить, вышла ли новая версия'
-    'update:обновиться до последней версии'
-    'uninstall:убрать строку статуса и сам бинарь'
-    'divoom:панель лимитов на Divoom Times Gate'
-    'completion:скрипт автодополнения для оболочки'
-    'version:показать версию'
-    'help:справка'
+    'install:register in the Claude Code settings'
+    'check:check whether a new version is out'
+    'update:update to the latest version'
+    'uninstall:remove the status line and the binary'
+    'divoom:limits panel on a Divoom Times Gate'
+    'completion:shell completion script'
+    'version:print the version'
+    'help:help'
   )
   local -a divoom_commands
   divoom_commands=(
-    'on:найти устройство и включить панель'
-    'off:выключить панель'
-    'once:отправить панель один раз'
-    'screen:показать или занять экран 1-5'
-    'preview:сохранить кадр в файл'
-    'help:справка'
+    'on:find the device and turn the panel on'
+    'off:turn the panel off'
+    'once:send the panel once'
+    'screen:show or take over screen 1-5'
+    'preview:save a frame to a file'
+    'help:help'
   )
 
   if (( CURRENT == 2 )); then
-    _describe 'команда' commands
+    _describe 'command' commands
   elif (( CURRENT == 3 )) && [[ ${words[2]} == divoom ]]; then
-    _describe 'команда' divoom_commands
+    _describe 'command' divoom_commands
   fi
 }
 compdef _claudestatus claudestatus
@@ -64,11 +66,13 @@ func completion(args []string) error {
 
 	switch shell {
 	case "zsh":
-		fmt.Print(zshCompletion)
+		// Only the zsh script carries descriptions, so only it is translated;
+		// bash completes bare command names.
+		fmt.Print(i18n.T(zshCompletion))
 	case "bash":
 		fmt.Print(bashCompletion)
 	default:
-		fmt.Fprint(os.Stderr, completionUsage)
+		fmt.Fprint(os.Stderr, i18n.T(completionUsage))
 		os.Exit(2)
 	}
 	return nil

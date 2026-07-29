@@ -16,33 +16,38 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/ivan-moskvin/claude_monitor/i18n"
 )
 
-// Обновляемся тем же способом, каким ставились: качаем готовый бинарь из релиза
-// и подменяем им себя. Ни go, ни клона репозитория на машине не нужно.
+// We update the same way we were installed: download the ready binary from a
+// release and replace ourselves with it. Neither Go nor a clone of the
+// repository is needed on the machine.
 const (
 	repository = "ivan-moskvin/claude_monitor"
-	// Первый вызов проверяет сразу — кэша ещё нет, — дальше не чаще раза в час.
+	// The first call checks right away — there is no cache yet — and after that
+	// no more than once an hour.
 	updateCheckInterval = time.Hour
 	networkTimeout      = 20 * time.Second
 	downloadTimeout     = 5 * time.Minute
 )
 
-// Адреса вынесены в переменные, чтобы проверять обновление на локальном сервере,
-// не выкладывая релиз.
+// The addresses are variables so that updating can be tested against a local
+// server without publishing a release.
 var (
 	releaseAPI   = "https://api.github.com/repos/" + repository + "/releases/latest"
 	downloadBase = "https://github.com/" + repository + "/releases/download/"
 )
 
-// updateCache лежит в кэше пользователя: это не настройка, потерять его не жаль.
+// updateCache lives in the user cache: it is not a setting, losing it costs
+// nothing.
 type updateCache struct {
 	CheckedAt int64  `json:"checked_at"`
 	Latest    string `json:"latest"`
 }
 
-// check спрашивает у GitHub последний релиз и запоминает его версию.
-// С --quiet работает молча — так её зовёт строка статуса.
+// check asks GitHub for the latest release and remembers its version.
+// With --quiet it works silently — that is how the status line calls it.
 func check(quiet bool) error {
 	touchCache()
 
@@ -60,16 +65,16 @@ func check(quiet bool) error {
 
 	switch {
 	case newer(version(), latest):
-		fmt.Printf("Установлено %s, вышло %s — обновиться: claudestatus update\n", version(), latest)
+		fmt.Printf(i18n.T("%s installed, %s is out — update with: claudestatus update\n"), version(), latest)
 	case version() == devVersion:
-		fmt.Printf("Сборка не из релиза, последняя версия — %s\n", latest)
+		fmt.Printf(i18n.T("Not a release build, the latest version is %s\n"), latest)
 	default:
-		fmt.Printf("Установлена последняя версия: %s\n", version())
+		fmt.Printf(i18n.T("The latest version is installed: %s\n"), version())
 	}
 	return nil
 }
 
-// update качает бинарь последнего релиза и заменяет им себя.
+// update downloads the binary of the latest release and replaces itself with it.
 func update() error {
 	latest, err := latestVersion()
 	if err != nil {
@@ -78,7 +83,7 @@ func update() error {
 	_ = writeCache(updateCache{CheckedAt: time.Now().Unix(), Latest: latest})
 
 	if !newer(version(), latest) && version() != devVersion {
-		fmt.Printf("Уже последняя версия: %s\n", version())
+		fmt.Printf(i18n.T("Already the latest version: %s\n"), version())
 		return nil
 	}
 
@@ -88,64 +93,65 @@ func update() error {
 	}
 
 	if version() == devVersion {
-		fmt.Printf("==> Установка %s\n", latest)
+		fmt.Printf(i18n.T("==> Installing %s\n"), latest)
 	} else {
-		fmt.Printf("==> Обновление %s → %s\n", version(), latest)
+		fmt.Printf(i18n.T("==> Updating %s → %s\n"), version(), latest)
 	}
 	if err := replaceSelf(exe, latest); err != nil {
 		return err
 	}
 
-	fmt.Printf("Готово: %s. Строка статуса обновится сама, перезапускать Claude Code не нужно.\n", latest)
+	fmt.Printf(i18n.T("Done: %s. The status line picks it up by itself, no need to restart Claude Code.\n"), latest)
 	return nil
 }
 
-// replaceSelf скачивает бинарь релиза рядом с текущим и подменяет его
-// переименованием: писать поверх работающего файла нельзя, а rename переживает
-// даже собственный запущенный процесс.
+// replaceSelf downloads the release binary next to the current one and swaps
+// them by renaming: writing over a running file is not allowed, while a rename
+// survives even our own running process.
 func replaceSelf(exe, tag string) error {
 	asset := assetName()
 
 	sums, err := download(downloadBase + tag + "/checksums.txt")
 	if err != nil {
-		return fmt.Errorf("не удалось скачать контрольные суммы: %w", err)
+		return fmt.Errorf(i18n.T("could not download the checksums: %w"), err)
 	}
 	want, ok := checksumFor(string(sums), asset)
 	if !ok {
-		return fmt.Errorf("в релизе %s нет бинаря для %s/%s", tag, runtime.GOOS, runtime.GOARCH)
+		return fmt.Errorf(i18n.T("release %s has no binary for %s/%s"), tag, runtime.GOOS, runtime.GOARCH)
 	}
 
 	binary, err := download(downloadBase + tag + "/" + asset)
 	if err != nil {
-		return fmt.Errorf("не удалось скачать %s: %w", asset, err)
+		return fmt.Errorf(i18n.T("could not download %s: %w"), asset, err)
 	}
 
 	got := sha256.Sum256(binary)
 	if hex.EncodeToString(got[:]) != want {
-		return fmt.Errorf("контрольная сумма %s не сошлась — файл побился или подменён", asset)
+		return fmt.Errorf(i18n.T("the checksum of %s does not match — the file is broken or tampered with"), asset)
 	}
 
 	staged := exe + ".new"
 	if err := os.WriteFile(staged, binary, 0o755); err != nil {
-		return fmt.Errorf("не удалось записать %s: %w", staged, err)
+		return fmt.Errorf(i18n.T("could not write %s: %w"), staged, err)
 	}
 
 	previous := exe + ".old"
 	_ = os.Remove(previous)
 	if err := os.Rename(exe, previous); err != nil {
 		_ = os.Remove(staged)
-		return fmt.Errorf("не удалось убрать прежний бинарь: %w", err)
+		return fmt.Errorf(i18n.T("could not move the previous binary away: %w"), err)
 	}
 	if err := os.Rename(staged, exe); err != nil {
 		_ = os.Rename(previous, exe)
-		return fmt.Errorf("не удалось поставить новый бинарь: %w", err)
+		return fmt.Errorf(i18n.T("could not put the new binary in place: %w"), err)
 	}
-	// В Windows запущенный файл удалить не дадут — уберётся при следующем update.
+	// Windows will not let a running file be deleted — it goes away on the next
+	// update.
 	_ = os.Remove(previous)
 	return nil
 }
 
-// assetName — имя файла в релизе для текущей платформы.
+// assetName — the file name in the release for the current platform.
 func assetName() string {
 	name := fmt.Sprintf("claudestatus_%s_%s", runtime.GOOS, runtime.GOARCH)
 	if runtime.GOOS == "windows" {
@@ -154,7 +160,8 @@ func assetName() string {
 	return name
 }
 
-// checksumFor ищет строку вида "<sha256>  <файл>" — формат sha256sum.
+// checksumFor looks for a line of the form "<sha256>  <file>" — the sha256sum
+// format.
 func checksumFor(sums, asset string) (string, bool) {
 	for _, line := range strings.Split(sums, "\n") {
 		fields := strings.Fields(line)
@@ -165,21 +172,21 @@ func checksumFor(sums, asset string) (string, bool) {
 	return "", false
 }
 
-// latestVersion спрашивает у GitHub тег последнего релиза.
+// latestVersion asks GitHub for the tag of the latest release.
 func latestVersion() (string, error) {
 	body, err := fetch(releaseAPI, networkTimeout, "application/vnd.github+json")
 	if err != nil {
-		return "", fmt.Errorf("не удалось узнать последнюю версию: %w", err)
+		return "", fmt.Errorf(i18n.T("could not find out the latest version: %w"), err)
 	}
 
 	var release struct {
 		TagName string `json:"tag_name"`
 	}
 	if err := json.Unmarshal(body, &release); err != nil {
-		return "", fmt.Errorf("не удалось разобрать ответ GitHub: %w", err)
+		return "", fmt.Errorf(i18n.T("could not parse the GitHub response: %w"), err)
 	}
 	if release.TagName == "" {
-		return "", fmt.Errorf("у %s ещё нет релизов", repository)
+		return "", fmt.Errorf(i18n.T("%s has no releases yet"), repository)
 	}
 	return release.TagName, nil
 }
@@ -205,12 +212,13 @@ func fetch(url string, timeout time.Duration, accept string) ([]byte, error) {
 	defer response.Body.Close()
 
 	if response.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("%s ответил %s", url, response.Status)
+		return nil, fmt.Errorf(i18n.T("%s answered %s"), url, response.Status)
 	}
 	return io.ReadAll(response.Body)
 }
 
-// updateAvailable отвечает по кэшу — строка статуса в сеть не ходит.
+// updateAvailable answers from the cache — the status line never goes to the
+// network.
 func updateAvailable() (string, bool) {
 	cache, ok := readCache()
 	if !ok || !newer(version(), cache.Latest) {
@@ -219,9 +227,10 @@ func updateAvailable() (string, bool) {
 	return cache.Latest, true
 }
 
-// autoCheck запускает проверку отдельным процессом — при первом вызове и потом
-// не чаще раза в час, то есть и в начале сессии, и по ходу работы. Ждать его
-// нельзя: строка статуса рисуется на каждый чих и должна возвращаться сразу.
+// autoCheck starts the check as a separate process — on the first call and then
+// no more than once an hour, that is both at the start of a session and while
+// working. Waiting for it is not allowed: the status line is drawn on every
+// keystroke and has to return at once.
 func autoCheck() {
 	if os.Getenv("CLAUDESTATUS_NO_AUTO_UPDATE") != "" {
 		return
@@ -234,13 +243,13 @@ func autoCheck() {
 		return
 	}
 
-	// Отметку времени ставим до запуска: иначе несколько сессий разом
-	// поднимут по своей проверке.
+	// The timestamp is written before starting: otherwise several sessions
+	// would each spawn their own check.
 	touchCache()
 
 	cmd := exec.Command(exe, "check", "--quiet")
-	// Вывод отвязываем от нашего: Claude Code читает stdout строки статуса
-	// и ждал бы закрытия трубы фоновым процессом.
+	// The output is detached from ours: Claude Code reads the stdout of the
+	// status line and would wait for the background process to close the pipe.
 	cmd.Stdin, cmd.Stdout, cmd.Stderr = nil, nil, nil
 	if cmd.Start() == nil {
 		_ = cmd.Process.Release()
@@ -291,7 +300,8 @@ func writeCache(cache updateCache) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return err
 	}
-	// Пишем через временный файл: строка статуса может читать кэш прямо сейчас.
+	// Written through a temporary file: the status line may be reading the
+	// cache right now.
 	staged := path + ".tmp"
 	if err := os.WriteFile(staged, data, 0o644); err != nil {
 		return err
@@ -299,19 +309,21 @@ func writeCache(cache updateCache) error {
 	return os.Rename(staged, path)
 }
 
-// touchCache отмечает попытку проверки, не трогая известную версию: неудачный
-// запрос не должен ни гасить значок обновления, ни звать проверку каждую секунду.
+// touchCache records an attempt to check without touching the known version: a
+// failed request must neither put out the update mark nor make the check run
+// every second.
 func touchCache() {
 	cache, _ := readCache()
 	cache.CheckedAt = time.Now().Unix()
 	_ = writeCache(cache)
 }
 
-// versionOverride проставляется при сборке релиза (-X main.versionOverride=v1.2.3).
+// versionOverride is set when a release is built (-X main.versionOverride=v1.2.3).
 var versionOverride string
 
-// version читает версию из самого бинаря: у релизной сборки её проставляет CI,
-// у собранной руками её нет — такая считается устаревшей и значок не зажигает.
+// version reads the version out of the binary itself: CI stamps it into a
+// release build, a hand-made build has none — such a build counts as outdated
+// and never lights the mark up.
 func version() string {
 	if _, valid := parseVersion(versionOverride); valid {
 		return versionOverride
@@ -339,8 +351,8 @@ func (v semver) less(other semver) bool {
 	return v.patch < other.patch
 }
 
-// parseVersion читает тег вида v1.2.3: суффикс после дефиса (-rc1) на сравнение
-// номера не влияет.
+// parseVersion reads a tag of the form v1.2.3: a suffix after the dash (-rc1)
+// does not take part in comparing the number.
 func parseVersion(value string) (semver, bool) {
 	value = strings.TrimPrefix(strings.TrimSpace(value), "v")
 	if i := strings.IndexAny(value, "-+"); i >= 0 {
@@ -363,8 +375,8 @@ func parseVersion(value string) (semver, bool) {
 	return parsed, true
 }
 
-// newer сравнивает установленную версию с тегом. Сборка не из релиза считается
-// устаревшей: у неё нет номера, с которым можно сравнивать.
+// newer compares the installed version against a tag. A build made outside a
+// release counts as outdated: it has no number to compare with.
 func newer(current, tag string) bool {
 	latest, ok := parseVersion(tag)
 	if !ok {

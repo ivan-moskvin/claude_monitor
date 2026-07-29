@@ -4,22 +4,24 @@ package divoom
 
 import "syscall"
 
-// Работа с чужим процессом устроена по-разному на разных системах, поэтому
-// живёт в файлах с build-тегами: в пакете syscall под Windows нет ни Kill,
-// ни поля Setsid, и кросс-компиляция релизных бинарей падала именно на этом.
+// Dealing with somebody else's process works differently on different systems,
+// so it lives in files behind build tags: the syscall package on Windows has
+// neither Kill nor the Setsid field, and cross-compiling the release binaries
+// used to fail on exactly that.
 
-// gracefulStop — умеет ли система попросить процесс завершиться, дав ему
-// прибраться. На Unix это SIGTERM, и мост успевает вернуть экрану циферблат.
+// gracefulStop — can the system ask a process to finish and let it clean up. On
+// Unix that is SIGTERM, and the bridge manages to give the screen its clock
+// face back.
 const gracefulStop = true
 
-// detachAttrs отвязывает мост от группы процессов Claude Code: иначе он умрёт
-// вместе с вызовом строки статуса, ради которого его и подняли.
+// detachAttrs detaches the bridge from the process group of Claude Code:
+// otherwise it dies together with the status line call that started it.
 func detachAttrs() *syscall.SysProcAttr {
 	return &syscall.SysProcAttr{Setsid: true}
 }
 
-// processAlive — существует ли процесс. Сигнал 0 ничего ему не делает, но
-// отвечает на этот вопрос.
+// processAlive — does the process exist. Signal 0 does nothing to it but
+// answers that question.
 func processAlive(pid int) bool {
 	return syscall.Kill(pid, 0) == nil
 }

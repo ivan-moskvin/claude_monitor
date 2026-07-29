@@ -3,14 +3,17 @@ package divoom
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
 	"time"
+
+	"github.com/ivan-moskvin/claude_monitor/i18n"
 )
 
-// Облачный каталог: по публичному адресу отдаёт устройства из той же сети.
-// Авторизации не требует.
+// The cloud directory: it answers with the devices sitting behind the same
+// public address. No authorization required.
 const lanDirectory = "https://app.divoom-gz.com/Device/ReturnSameLANDevice"
 
 type device struct {
@@ -18,9 +21,9 @@ type device struct {
 	lcd int
 }
 
-// call шлёт команду устройству. HTTP 200 приходит всегда, поэтому настоящий
-// результат смотрим в error_code: он бывает и числом, и строкой с текстом
-// ошибки — «Request data illegal json» означает неизвестную команду.
+// call sends a command to the device. HTTP 200 always comes back, so the real
+// result is in error_code: it is sometimes a number and sometimes a string with
+// the text of the error — "Request data illegal json" means an unknown command.
 func (d device) call(payload map[string]any) error {
 	body, err := json.Marshal(payload)
 	if err != nil {
@@ -30,7 +33,7 @@ func (d device) call(payload map[string]any) error {
 	client := http.Client{Timeout: 8 * time.Second}
 	response, err := client.Post("http://"+d.ip+"/post", "application/json", bytes.NewReader(body))
 	if err != nil {
-		return fmt.Errorf("устройство недоступно: %w", err)
+		return fmt.Errorf(i18n.T("the device is unreachable: %w"), err)
 	}
 	defer response.Body.Close()
 
@@ -38,19 +41,19 @@ func (d device) call(payload map[string]any) error {
 		ErrorCode json.RawMessage `json:"error_code"`
 	}
 	if err := json.NewDecoder(response.Body).Decode(&result); err != nil {
-		return fmt.Errorf("устройство ответило не JSON: %w", err)
+		return fmt.Errorf(i18n.T("the device answered with something other than JSON: %w"), err)
 	}
 
 	code := string(bytes.Trim(result.ErrorCode, `"`))
 	if code != "0" && code != "" {
-		return fmt.Errorf("устройство отклонило команду: %s", code)
+		return fmt.Errorf(i18n.T("the device rejected the command: %s"), code)
 	}
 	return nil
 }
 
-// showGif просит устройство скачать GIF по ссылке и показать его на своём
-// экране. Картинку тянет само устройство — заливка кадра пикселями
-// (Draw/SendHttpGif) на этой прошивке принимается, но ничего не рисует.
+// showGif asks the device to download a GIF by its link and show it on its
+// screen. The device pulls the picture itself — pushing the frame as pixels
+// (Draw/SendHttpGif) is accepted by this firmware but draws nothing.
 func (d device) showGif(url string) error {
 	lcdArray := []int{0, 0, 0, 0, 0}
 	lcdArray[d.lcd] = 1
@@ -62,8 +65,8 @@ func (d device) showGif(url string) error {
 	})
 }
 
-// layout спрашивает облако, что показывают экраны устройства. Нужен один раз —
-// запомнить чужой циферблат, чтобы вернуть его при удалении.
+// layout asks the cloud what the screens of the device are showing. Needed
+// once — to remember somebody else's clock face and give it back on uninstall.
 func layout(deviceID int) (clockIDs []int, independence int, err error) {
 	url := fmt.Sprintf("https://app.divoom-gz.com/Channel/Get5LcdInfoV2?DeviceType=LCD&DeviceId=%d", deviceID)
 	client := http.Client{Timeout: 15 * time.Second}
@@ -85,7 +88,7 @@ func layout(deviceID int) (clockIDs []int, independence int, err error) {
 		return nil, 0, err
 	}
 	if len(result.LcdIndependenceList) == 0 {
-		return nil, 0, fmt.Errorf("устройство не отдало раскладку экранов")
+		return nil, 0, errors.New(i18n.T("the device did not return its screen layout"))
 	}
 
 	for _, entry := range result.LcdIndependenceList[0].LcdList {
@@ -94,12 +97,12 @@ func layout(deviceID int) (clockIDs []int, independence int, err error) {
 	return clockIDs, result.LcdIndependence, nil
 }
 
-// restoreScreen возвращает экрану циферблат, который был на нём до моста. Без
-// этого экран остаётся с последним кадром и уходит в вечную загрузку, как
-// только мост перестаёт отвечать на запросы устройства.
+// restoreScreen gives the screen back the clock face it had before the bridge.
+// Without that the screen keeps the last frame and goes into an endless loading
+// state as soon as the bridge stops answering the requests of the device.
 func (d device) restoreScreen(clockID, independence int) error {
 	if clockID == 0 {
-		return fmt.Errorf("прежний циферблат неизвестен")
+		return errors.New(i18n.T("the previous clock face is unknown"))
 	}
 	return d.call(map[string]any{
 		"Command":         "Channel/SetClockSelectId",
@@ -109,12 +112,13 @@ func (d device) restoreScreen(clockID, independence int) error {
 	})
 }
 
-// discover ищет Times Gate в локальной сети через облачный каталог.
+// discover looks for a Times Gate on the local network through the cloud
+// directory.
 func discover() (ip string, name string, deviceID int, err error) {
 	client := http.Client{Timeout: 15 * time.Second}
 	response, err := client.Post(lanDirectory, "application/json", bytes.NewReader([]byte("{}")))
 	if err != nil {
-		return "", "", 0, fmt.Errorf("каталог устройств недоступен: %w", err)
+		return "", "", 0, fmt.Errorf(i18n.T("the device directory is unreachable: %w"), err)
 	}
 	defer response.Body.Close()
 
@@ -129,16 +133,16 @@ func discover() (ip string, name string, deviceID int, err error) {
 		return "", "", 0, err
 	}
 	if len(result.DeviceList) == 0 {
-		return "", "", 0, fmt.Errorf("устройств Divoom в этой сети не видно")
+		return "", "", 0, errors.New(i18n.T("no Divoom devices are visible on this network"))
 	}
 
 	first := result.DeviceList[0]
 	return first.DevicePrivateIP, first.DeviceName, first.DeviceID, nil
 }
 
-// localIP — адрес, с которого нас увидит устройство. Соединение UDP ничего
-// не отправляет, но заставляет систему выбрать нужный интерфейс: перебирать
-// интерфейсы руками пришлось бы с догадками про VPN и мосты.
+// localIP — the address the device will see us at. The UDP connection sends
+// nothing but makes the system pick the right interface: walking the interfaces
+// by hand would mean guessing about VPNs and bridges.
 func localIP(target string) (string, error) {
 	conn, err := net.Dial("udp", target+":80")
 	if err != nil {

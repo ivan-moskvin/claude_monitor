@@ -7,11 +7,12 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ivan-moskvin/claude_monitor/i18n"
 	"github.com/ivan-moskvin/claude_monitor/paths"
 )
 
-// Снапшот старше этого возраста описывает прошлое: Claude Code обновляет его
-// только во время сессии.
+// A snapshot older than this describes the past: Claude Code only refreshes it
+// during a session.
 const staleAfter = 90 * time.Second
 
 const snapshotName = "usage-snapshot.json"
@@ -19,7 +20,7 @@ const snapshotName = "usage-snapshot.json"
 type snapshot struct {
 	windows map[string]usageWindow
 	stale   bool
-	// Возраст снапшота; показываем его, когда данные перестали обновляться.
+	// The age of the snapshot; shown once the data stops being refreshed.
 	age time.Duration
 	err string
 }
@@ -51,12 +52,12 @@ func readSnapshot() snapshot {
 
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return snapshot{err: "снапшот не найден"}
+		return snapshot{err: i18n.T("no snapshot found")}
 	}
 
 	var raw rawSnapshot
 	if err := json.Unmarshal(data, &raw); err != nil {
-		return snapshot{err: "снапшот повреждён"}
+		return snapshot{err: i18n.T("the snapshot is damaged")}
 	}
 
 	now := float64(time.Now().UnixNano()) / 1e9
@@ -69,8 +70,9 @@ func readSnapshot() snapshot {
 		if entry.ResetsAt != nil {
 			resetsAt := normalizeEpoch(*entry.ResetsAt)
 			if resetsAt <= now {
-				// Проценты описывают прошедшее окно, в новом расход
-				// начинается с нуля — старое число показывать нельзя.
+				// The percentages describe a window that is over; in the new
+				// one usage starts from zero — the old number must not be
+				// shown.
 				w.expired = true
 				w.used = 0
 			} else {
@@ -81,7 +83,7 @@ func readSnapshot() snapshot {
 	}
 
 	if len(windows) == 0 {
-		return snapshot{err: "лимитов в снапшоте нет"}
+		return snapshot{err: i18n.T("the snapshot holds no limits")}
 	}
 
 	result := snapshot{windows: windows}
@@ -96,8 +98,8 @@ func (s snapshot) window(id string) usageWindow {
 	return s.windows[id]
 }
 
-// usageKey — только проценты, без обратного отсчёта: их рост показываем сразу,
-// а сдвиг минуты подождёт (см. minSendInterval).
+// usageKey — the percentages only, without the countdown: their growth is shown
+// at once, a shifted minute can wait (see minSendInterval).
 func (s snapshot) usageKey() string {
 	if s.err != "" {
 		return "err:" + s.err
@@ -110,15 +112,17 @@ func (s snapshot) usageKey() string {
 	return key.String()
 }
 
-// Длина пятичасового окна — по ней считается, сколько его уже прошло.
+// The length of the five-hour window — how much of it has passed is counted
+// against this.
 const fiveHourSeconds = 5 * 60 * 60
 
 func (w usageWindow) fraction() float64 {
 	return w.used / 100
 }
 
-// elapsedFraction — какая часть окна прожита. Полоса сброса показывает
-// именно время, а не расход: в строке статуса это отдельная шкала.
+// elapsedFraction — how much of the window has been lived through. The reset
+// bar shows time rather than usage: in the status line that is a scale of its
+// own.
 func (w usageWindow) elapsedFraction() float64 {
 	if w.expired || w.secondsLeft <= 0 {
 		return 1
@@ -133,10 +137,10 @@ func (w usageWindow) percentLabel() string {
 	return fmt.Sprintf("%.0f%%", w.used)
 }
 
-// tint — единственное место с порогами цвета: до 60% зелёный, до 85%
-// оранжевый, дальше красный. Ровно как usageColor в строке статуса, и оба
-// окна расхода красятся одинаково: циан там только у полосы сброса, потому
-// что она показывает время, а не риск. Сброшенное окно гасим.
+// tint — the only place with the color thresholds: green up to 60%, orange up
+// to 85%, red above. Exactly like usageColor in the status line, and both usage
+// windows are painted the same way: cyan belongs to the reset bar alone,
+// because that one shows time and not risk. A window that has reset is dimmed.
 func (w usageWindow) tint() uint8 {
 	switch {
 	case !w.present || w.expired:
@@ -150,7 +154,7 @@ func (w usageWindow) tint() uint8 {
 	}
 }
 
-// normalizeEpoch принимает Unix-время в секундах или миллисекундах.
+// normalizeEpoch accepts Unix time in seconds or in milliseconds.
 func normalizeEpoch(value float64) float64 {
 	if value > 1e12 {
 		return value / 1000

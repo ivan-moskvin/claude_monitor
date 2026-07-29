@@ -1,51 +1,54 @@
-// Пакет divoom — подкоманда `claudestatus divoom`: панель с лимитами Claude
-// на экране Divoom Times Gate.
+// Package divoom — the `claudestatus divoom` subcommand: a panel with the
+// Claude limits on the screen of a Divoom Times Gate.
 //
-// Читает тот же снимок лимитов, что пишет строка статуса, рисует
-// панель 128×128 и отдаёт её устройству. Кадр устройство скачивает само:
-// мост поднимает локальный HTTP-сервер и присылает ссылку командой
-// Device/PlayGif — заливка пикселей (Draw/SendHttpGif) на прошивке Times Gate
-// принимается, но ничего не рисует.
+// It reads the same usage snapshot the status line writes, draws a 128×128
+// panel and hands it to the device. The device downloads the frame itself: the
+// bridge brings up a local HTTP server and sends the link with a Device/PlayGif
+// command — pushing pixels (Draw/SendHttpGif) is accepted by the Times Gate
+// firmware but draws nothing.
 package divoom
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
+
+	"github.com/ivan-moskvin/claude_monitor/i18n"
 )
 
 const (
-	// Снапшот переписывается на каждый вызов строки статуса, то есть часто:
-	// опрашиваем бодро, чтение файла ничего не стоит.
+	// The snapshot is rewritten on every call of the status line, that is
+	// often: poll briskly, reading a file costs nothing.
 	pollInterval = 5 * time.Second
-	// Устройство моргает загрузкой на каждый кадр, поэтому сдвиг обратного
-	// отсчёта столько ждёт. Изменившиеся проценты этот порог не соблюдают:
-	// ради них панель и висит на стене.
+	// The device blinks its loading indicator on every frame, so a shift of the
+	// countdown waits this long. Changed percentages do not honour the
+	// threshold: they are why the panel hangs on the wall at all.
 	minSendInterval = 30 * time.Second
-	// Периодически повторяем последний кадр: устройство могло перезагрузиться
-	// или потерять картинку, а снапшот при этом не меняется неделями.
+	// Resend the last frame from time to time: the device may have rebooted or
+	// lost the picture while the snapshot stayed the same for weeks.
 	resendAfter = 15 * time.Minute
-	// Сколько ждём, пока устройство придёт за кадром.
+	// How long we wait for the device to come and take the frame.
 	fetchTimeout = 20 * time.Second
 )
 
-const usage = `claudestatus divoom — панель лимитов на экране Divoom Times Gate.
+const usage = `claudestatus divoom — limits panel on the screen of a Divoom Times Gate.
 
-Использование:
-  claudestatus divoom on           найти Times Gate в сети и включить панель
-  claudestatus divoom off          выключить панель и вернуть экрану циферблат
-  claudestatus divoom              держать панель обновлённой (работает, пока запущен)
-  claudestatus divoom once         отправить панель один раз и выйти
-  claudestatus divoom screen [N]   показать или занять экран 1–5
-  claudestatus divoom preview FILE сохранить кадр в файл, не трогая устройство
+Usage:
+  claudestatus divoom on           find the Times Gate on the network and turn the panel on
+  claudestatus divoom off          turn the panel off and give the screen its clock face back
+  claudestatus divoom              keep the panel updated (works while running)
+  claudestatus divoom once         send the panel once and exit
+  claudestatus divoom screen [N]   show or take over screen 1–5
+  claudestatus divoom preview FILE save a frame to a file without touching the device
 
-Настройки — divoom.json в каталоге приложения, создаёт on.
+The settings are divoom.json in the application directory, created by on.
 `
 
-// Run — точка входа подкоманды. Ошибки возвращаются наверх: печатает их и
-// выбирает код возврата CLI, а не пакет.
+// Run — the entry point of the subcommand. Errors are returned upwards: it is
+// the CLI, not the package, that prints them and picks the exit code.
 func Run(args []string) error {
 	if len(args) == 0 {
 		return run(false)
@@ -62,7 +65,7 @@ func Run(args []string) error {
 		return screen(args[1:])
 	case "preview":
 		if len(args) < 2 {
-			return fmt.Errorf("укажите файл: claudestatus divoom preview panel.gif")
+			return errors.New(i18n.T("name a file: claudestatus divoom preview panel.gif"))
 		}
 		data, _, err := render(readSnapshot())
 		if err != nil {
@@ -70,10 +73,10 @@ func Run(args []string) error {
 		}
 		return os.WriteFile(args[1], data, 0o644)
 	case "help", "--help", "-h":
-		fmt.Print(usage)
+		fmt.Print(i18n.T(usage))
 		return nil
 	default:
-		return fmt.Errorf("неизвестная команда: %s\n\n%s", args[0], usage)
+		return fmt.Errorf(i18n.T("unknown command: %s\n\n%s"), args[0], i18n.T(usage))
 	}
 }
 
@@ -88,15 +91,16 @@ func run(once bool) error {
 		if err != nil {
 			return err
 		}
-		fmt.Printf("Найдено устройство %s: %s\n", name, ip)
+		fmt.Printf(i18n.T("Found device %s: %s\n"), name, ip)
 		cfg.IP, cfg.DeviceID = ip, deviceID
 		if err := cfg.save(); err != nil {
 			return err
 		}
 	}
 
-	// Идентификатор устройства мог не попасть в конфиг: при заданном вручную IP
-	// автопоиск не запускался, а раскладку экранов без него не спросить.
+	// The device id may have missed the config: with a hand-written IP the
+	// discovery never ran, and without the id there is no way to ask for the
+	// screen layout.
 	if cfg.DeviceID == 0 {
 		if _, _, deviceID, err := discover(); err == nil {
 			cfg.DeviceID = deviceID
@@ -104,8 +108,8 @@ func run(once bool) error {
 		}
 	}
 
-	// Запоминаем чужой циферблат до того, как займём экран: вернуть его при
-	// удалении иначе будет неоткуда.
+	// Remember the clock face that was there before we take the screen: come
+	// uninstall time there would be nowhere else to get it from.
 	if cfg.PrevClockID == 0 && cfg.DeviceID != 0 {
 		if clocks, independence, err := layout(cfg.DeviceID); err == nil && cfg.LcdIndex < len(clocks) {
 			cfg.PrevClockID, cfg.PrevIndependence = clocks[cfg.LcdIndex], independence
@@ -115,7 +119,7 @@ func run(once bool) error {
 
 	host, err := localIP(cfg.IP)
 	if err != nil {
-		return fmt.Errorf("не удалось определить свой адрес в сети устройства: %w", err)
+		return fmt.Errorf(i18n.T("could not determine our own address on the device network: %w"), err)
 	}
 
 	server := newAssets(cfg.Port, cfg.IP)
@@ -143,13 +147,13 @@ func run(once bool) error {
 
 		switch {
 		case hash == lastHash:
-			// Кадр тот же — повторяем изредка, чтобы устройство не потеряло
-			// картинку после своей перезагрузки.
+			// Same frame — resend it rarely, so that the device does not lose
+			// the picture after a reboot of its own.
 			if time.Since(lastSent) < resendAfter {
 				return nil
 			}
 		case usage == lastUsage && !lastSent.IsZero() && time.Since(lastSent) < minSendInterval:
-			// Изменился только обратный отсчёт — не гоняем устройство ради него.
+			// Only the countdown moved — not worth bothering the device.
 			return nil
 		}
 
@@ -159,11 +163,11 @@ func run(once bool) error {
 		}
 		lastHash, lastUsage, lastSent = hash, usage, time.Now()
 
-		// Команда доставляется мгновенно, а за картинкой устройство приходит
-		// отдельным запросом — при разовой отправке нельзя выходить раньше,
-		// иначе сервер закроется до того, как кадр заберут.
+		// The command is delivered instantly, but the device comes for the
+		// picture in a separate request — a one-shot send must not exit
+		// earlier, or the server closes before the frame is taken.
 		if wait && !server.awaitFetch(url, fetchTimeout) {
-			return fmt.Errorf("устройство не забрало кадр за %s", fetchTimeout)
+			return fmt.Errorf(i18n.T("the device did not take the frame within %s"), fetchTimeout)
 		}
 		return nil
 	}
@@ -175,14 +179,15 @@ func run(once bool) error {
 		return nil
 	}
 
-	// Второй мост на то же устройство слал бы кадры вперемешку с первым.
+	// A second bridge to the same device would interleave its frames with the
+	// first one.
 	if err := takeLock(); err != nil {
 		return err
 	}
 	defer dropLock()
 
-	// По сигналу возвращаем экрану прежний циферблат: иначе на нём останется
-	// последний кадр, за которым уже некому приходить.
+	// On a signal we give the screen its previous clock face back: otherwise it
+	// keeps the last frame, with nobody left to come for it.
 	stopping := make(chan os.Signal, 1)
 	signal.Notify(stopping, os.Interrupt, syscall.SIGTERM)
 	go func() {
@@ -192,19 +197,19 @@ func run(once bool) error {
 		os.Exit(0)
 	}()
 
-	fmt.Printf("Панель на экране %d устройства %s, обновление каждые %s\n",
+	fmt.Printf(i18n.T("Panel on screen %d of device %s, updated every %s\n"),
 		cfg.LcdIndex, cfg.IP, pollInterval)
 
-	// Ошибки в цикле не роняют мост: устройство могли выключить на ночь.
-	// Но и висеть вечно рядом с выключенным устройством незачем — после
-	// giveUpAfter мост уходит, а строка статуса поднимет его, когда Times Gate
-	// вернётся в сеть.
+	// Errors inside the loop do not bring the bridge down: the device may have
+	// been switched off for the night. But hanging around a switched-off device
+	// forever is pointless too — after giveUpAfter the bridge leaves, and the
+	// status line starts it again once the Times Gate is back on the network.
 	lastSeen := time.Now()
 	for range time.Tick(pollInterval) {
 		if err := send(false); err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			if time.Since(lastSeen) > giveUpAfter {
-				return fmt.Errorf("устройство недоступно дольше %s, выхожу", giveUpAfter)
+				return fmt.Errorf(i18n.T("the device has been unreachable for more than %s, leaving"), giveUpAfter)
 			}
 			continue
 		}

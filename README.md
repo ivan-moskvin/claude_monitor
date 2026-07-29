@@ -1,12 +1,12 @@
 # claude_monitor
 
-Лимиты Claude в строке статуса Claude Code — видно во время работы, без `/usage`.
+Claude limits in the Claude Code status line — visible while you work, without `/usage`.
 
-![Строка статуса в Claude Code](statusline.webp)
+![The status line in Claude Code](statusline.webp)
 
-## Установка
+## Install
 
-macOS и Linux:
+macOS and Linux:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/ivan-moskvin/claude_monitor/main/install.sh | sh
@@ -18,80 +18,94 @@ Windows (PowerShell):
 irm https://raw.githubusercontent.com/ivan-moskvin/claude_monitor/main/install.ps1 | iex
 ```
 
-## Обновление
+## Update
 
 ```bash
 claudestatus update
 ```
 
-Отключить проверку: `CLAUDESTATUS_NO_AUTO_UPDATE=1`.
+Turn the check off: `CLAUDESTATUS_NO_AUTO_UPDATE=1`.
 
-## Удаление
+## Uninstall
 
 ```bash
 claudestatus uninstall
 ```
 
-Убирает строку статуса из настроек, кэш, панель на Divoom и сам бинарь.
+Removes the status line from the settings, the cache, the Divoom panel and the binary itself.
 
-## Команды
+## Commands
 
 ```
-claudestatus            строка статуса: JSON сессии на stdin, строка на stdout
-claudestatus check      проверить, вышла ли новая версия
-claudestatus update     скачать последнюю версию и заменить себя ею
-claudestatus uninstall  убрать строку статуса, кэш и сам бинарь
-claudestatus divoom     показывать лимиты на экране Divoom Times Gate
-claudestatus version    показать версию
+claudestatus            status line: session JSON on stdin, line on stdout
+claudestatus check      check whether a new version is out
+claudestatus update     download the latest version and replace itself with it
+claudestatus uninstall  remove the status line, the cache and the binary
+claudestatus divoom     show the limits on a Divoom Times Gate screen
+claudestatus version    print the version
 ```
 
-## Строка статуса
+## The status line
 
-Модель, текущий уровень `/effort`, пятичасовое окно, время до его сброса и недельное
-окно. Круг рядом с моделью заполняется от `low` (`○`) до `max` (`●`). Цвет полос —
-по расходу: зелёный до 60%, оранжевый до 85%, дальше красный.
+The model, the current `/effort` level, the five-hour window, the time until it
+resets and the weekly window. The circle next to the model fills up from `low`
+(`○`) to `max` (`●`). The color of the bars follows usage: green up to 60%,
+orange up to 85%, red above.
 
-## Автодополнение
+## Language
+
+English by default, Russian on a Russian system. The language is taken from
+`LC_ALL` / `LC_MESSAGES` / `LANG` (on Windows, from the user interface language)
+and can be forced:
 
 ```bash
-claudestatus completion zsh >> ~/.zshrc    # или bash >> ~/.bashrc
+CLAUDESTATUS_LANG=en   # or ru
+```
+
+## Completion
+
+```bash
+claudestatus completion zsh >> ~/.zshrc    # or bash >> ~/.bashrc
 ```
 
 ## Divoom Times Gate
 
-Те же лимиты — на экране [Divoom Times Gate](https://divoom.com/products/time-gate).
+The same limits — on the screen of a [Divoom Times Gate](https://divoom.com/products/time-gate).
 
-![Панель лимитов на Divoom Times Gate](divoom.webp)
+![The limits panel on a Divoom Times Gate](divoom.webp)
 
 ```bash
 claudestatus divoom on
 ```
 
-Найдёт устройство в сети и включит панель. Дальше она обновляется сама, пока
-идёт сессия. Выключить: `claudestatus divoom off`.
+Finds the device on the network and turns the panel on. From there it updates
+itself while a session is running. Turn it off with `claudestatus divoom off`.
 
-Занимает пятый экран, сменить можно на любой:
+It takes the fifth screen, which can be changed to any other:
 
 ```bash
 claudestatus divoom screen 3
 ```
-Устройство рисует панель через загрузку кадра, поэтому при каждом обновлении
-экран моргает индикатором загрузки. Подробности протокола — в [divoom/README.md](divoom/README.md).
+The device draws the panel by downloading a frame, so on every update the screen
+blinks its loading indicator. The details of the protocol are in
+[divoom/README.md](divoom/README.md).
 
-## Безопасность
+## Security
 
-Лимиты приходят от самого Claude Code: он подаёт statusline-команде JSON сессии
-на stdin, оттуда и берутся цифры. Ни запросов к API Anthropic, ни токенов, ни
-обращений к Keychain — ваши ключи и переписка утилите недоступны. Цифры
-обновляются только пока идёт сессия.
+The limits come from Claude Code itself: it feeds the session JSON to the
+statusline command on stdin, and that is where the numbers are taken from. No
+requests to the Anthropic API, no tokens, no Keychain access — your keys and
+your conversations are out of reach for this utility. The numbers are refreshed
+only while a session is running.
 
-Наружу уходят два запроса, оба — не про вас:
+Two requests go outside, and neither is about you:
 
-- к GitHub — узнать версию последнего релиза и скачать бинарь;
-- к каталогу устройств Divoom — спросить адрес вашего Times Gate в локальной
-  сети. Каталог отвечает по общему публичному IP и отдаёт только адрес и модель.
+- to GitHub — to learn the version of the latest release and download the binary;
+- to the Divoom device directory — to ask for the address of your Times Gate on
+  the local network. The directory answers by shared public IP and returns the
+  address and the model only.
 
-Ни почты, ни паролей, ни токенов. Дальше мост работает без интернета: панель
-едет к Times Gate по локальному адресу, и отдаётся ему единственная картинка —
-та, что вы видите на экране. Забрать её может только само устройство.
-
+No mail, no passwords, no tokens. Beyond that the bridge works without the
+internet: the panel travels to the Times Gate over a local address, and the only
+picture handed to it is the one you see on the screen. Nothing but the device
+itself can fetch it.

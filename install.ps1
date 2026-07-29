@@ -1,5 +1,5 @@
-# Ставит claudestatus из последнего релиза. Дальше утилита обслуживает себя сама:
-# обновляется claudestatus update, удаляется claudestatus uninstall.
+# Installs claudestatus from the latest release. After that the utility looks
+# after itself: claudestatus update to update, claudestatus uninstall to remove.
 #
 #   irm https://raw.githubusercontent.com/ivan-moskvin/claude_monitor/main/install.ps1 | iex
 
@@ -8,10 +8,34 @@ $ErrorActionPreference = "Stop"
 $repo = "ivan-moskvin/claude_monitor"
 $binDir = if ($env:CLAUDESTATUS_BIN_DIR) { $env:CLAUDESTATUS_BIN_DIR } else { Join-Path $env:LOCALAPPDATA "claudestatus" }
 
+# The messages follow the interface language of the system, the same way the
+# binary picks it: CLAUDESTATUS_LANG wins, then the culture Windows reports.
+# Every language is one branch here — nothing below chooses wording again.
+$lang = if ($env:CLAUDESTATUS_LANG) { $env:CLAUDESTATUS_LANG } else { [System.Globalization.CultureInfo]::CurrentUICulture.TwoLetterISOLanguageName }
+$m = if ($lang -like "ru*") {
+    @{
+        UnknownArch  = "Неизвестная архитектура: {0} — соберите из исходников."
+        Downloading  = "==> Скачиваю {0}"
+        NoChecksum   = "В релизе нет контрольной суммы для {0}."
+        BadChecksum  = "Контрольная сумма не сошлась — загрузка побилась."
+        Installed    = "==> Поставлен в {0}"
+        PathAdded    = "==> Каталог добавлен в PATH — заработает в новом терминале"
+    }
+} else {
+    @{
+        UnknownArch  = "Unknown architecture: {0} — build it from source."
+        Downloading  = "==> Downloading {0}"
+        NoChecksum   = "The release has no checksum for {0}."
+        BadChecksum  = "The checksum does not match — the download is broken."
+        Installed    = "==> Installed to {0}"
+        PathAdded    = "==> The directory was added to PATH — it works in a new terminal"
+    }
+}
+
 $arch = switch ($env:PROCESSOR_ARCHITECTURE) {
     "AMD64" { "amd64" }
     "ARM64" { "arm64" }
-    default { throw "Неизвестная архитектура: $env:PROCESSOR_ARCHITECTURE — соберите из исходников." }
+    default { throw ($m.UnknownArch -f $env:PROCESSOR_ARCHITECTURE) }
 }
 
 $asset = "claudestatus_windows_$arch.exe"
@@ -20,29 +44,30 @@ $tmp = Join-Path ([System.IO.Path]::GetTempPath()) ([System.IO.Path]::GetRandomF
 New-Item -ItemType Directory -Path $tmp | Out-Null
 
 try {
-    Write-Host "==> Скачиваю $asset"
+    Write-Host ($m.Downloading -f $asset)
     Invoke-WebRequest -Uri "$base/$asset" -OutFile "$tmp\claudestatus.exe"
     Invoke-WebRequest -Uri "$base/checksums.txt" -OutFile "$tmp\checksums.txt"
 
     $want = (Get-Content "$tmp\checksums.txt" |
         Where-Object { $_ -match "\s\*?$([regex]::Escape($asset))$" } |
         ForEach-Object { ($_ -split '\s+')[0] })
-    if (-not $want) { throw "В релизе нет контрольной суммы для $asset." }
+    if (-not $want) { throw ($m.NoChecksum -f $asset) }
 
     $got = (Get-FileHash "$tmp\claudestatus.exe" -Algorithm SHA256).Hash
-    if ($got -ne $want.ToUpper()) { throw "Контрольная сумма не сошлась — загрузка побилась." }
+    if ($got -ne $want.ToUpper()) { throw $m.BadChecksum }
 
     New-Item -ItemType Directory -Force -Path $binDir | Out-Null
     Move-Item -Force "$tmp\claudestatus.exe" (Join-Path $binDir "claudestatus.exe")
-    Write-Host "==> Поставлен в $binDir\claudestatus.exe"
+    Write-Host ($m.Installed -f (Join-Path $binDir "claudestatus.exe"))
 
-    # Каталог в PATH пользователя — иначе команда claudestatus не найдётся.
+    # The directory goes into the user PATH — otherwise the claudestatus command
+    # will not be found.
     $current = [Environment]::GetEnvironmentVariable("Path", "User")
     $entries = @()
     if ($current) { $entries = $current -split ";" | Where-Object { $_ } }
     if ($entries -notcontains $binDir) {
         [Environment]::SetEnvironmentVariable("Path", (($entries + $binDir) -join ";"), "User")
-        Write-Host "==> Каталог добавлен в PATH — заработает в новом терминале"
+        Write-Host $m.PathAdded
     }
 
     & (Join-Path $binDir "claudestatus.exe") install

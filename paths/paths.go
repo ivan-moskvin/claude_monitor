@@ -1,8 +1,8 @@
-// Пакет paths — где утилита держит свои файлы.
+// Package paths — where the utility keeps its files.
 //
-// Не в ~/.claude: тот каталог принадлежит Claude Code, и складывать туда чужое
-// состояние — значит мусорить у него под ногами. Каждая система предлагает своё
-// место для настроек приложения, его и берём.
+// Not in ~/.claude: that directory belongs to Claude Code, and putting foreign
+// state there means littering under its feet. Every system offers its own place
+// for application settings, and that is the one we take.
 package paths
 
 import (
@@ -12,7 +12,7 @@ import (
 
 const appName = "claudestatus"
 
-// Dir — каталог наших файлов, созданный, если его ещё нет:
+// Dir — the directory of our files, created if it is not there yet:
 // macOS ~/Library/Application Support/claudestatus, Windows %AppData%\claudestatus,
 // Linux ~/.config/claudestatus.
 func Dir() (string, error) {
@@ -27,8 +27,8 @@ func Dir() (string, error) {
 	return dir, nil
 }
 
-// File — путь к нашему файлу. Файлы прежних версий из ~/.claude переносим:
-// настройки не должны пропадать из-за переезда.
+// File — the path to one of our files. Files of earlier versions are moved out
+// of ~/.claude: settings must not disappear because of a relocation.
 func File(name string) (string, error) {
 	dir, err := Dir()
 	if err != nil {

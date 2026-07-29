@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/ivan-moskvin/claude_monitor/divoom"
+	"github.com/ivan-moskvin/claude_monitor/i18n"
 )
 
 const (
@@ -16,8 +17,8 @@ const (
 	fiveHourSeconds = 5 * 60 * 60
 )
 
-// Цвета 256-цветной палитры. Полосы расхода красятся по порогам, полоса
-// сброса всегда циан — там время, а не риск.
+// Colors of the 256-color palette. Usage bars are painted by threshold, the
+// reset bar is always cyan — it shows time, not risk.
 const (
 	colorGreen     = 35
 	colorOrange    = 214
@@ -30,9 +31,9 @@ const (
 	colorLightText = 231
 )
 
-// Шкала уровня reasoning effort: фазы круга — те же символы, что и у самого
-// Claude Code. Цвет намеренно в фиолетово-розовой гамме, чтобы не путался
-// с зелёным/оранжевым/красным полос расхода.
+// The reasoning effort scale: the circle phases are the very symbols Claude
+// Code itself uses. The color is deliberately purple to pink so that it is
+// never confused with the green/orange/red of the usage bars.
 var effortStyles = map[string]struct {
 	mark  string
 	color int
@@ -49,7 +50,7 @@ type sessionInput struct {
 	Model      struct {
 		DisplayName string `json:"display_name"`
 	} `json:"model"`
-	// Приходит только когда модель поддерживает параметр effort.
+	// Present only when the model supports the effort parameter.
 	Effort struct {
 		Level string `json:"level"`
 	} `json:"effort"`
@@ -60,11 +61,11 @@ type window struct {
 	ResetsAt       *float64 `json:"resets_at"`
 }
 
-// statusline печатает строку по JSON сессии со stdin — это режим по умолчанию,
-// именно он прописан в settings.json.
+// statusline prints the line from the session JSON on stdin — the default mode,
+// and the one settings.json points at.
 func statusline() {
-	// Проверку обновлений заводим в любом случае: даже пустой вход означает,
-	// что Claude Code жив и строку кто-то видит.
+	// The update check is started in any case: even empty input means Claude
+	// Code is alive and somebody is looking at the line.
 	defer autoCheck()
 
 	var input sessionInput
@@ -73,20 +74,21 @@ func statusline() {
 		return
 	}
 
-	// Лимиты приходят только сюда и только во время сессии: больше их взять
-	// неоткуда. Снапшот — единственный способ показать их за пределами строки
-	// статуса; ошибку записи глотаем, строка статуса важнее.
+	// The limits arrive here and only during a session: there is nowhere else
+	// to get them. The snapshot is the only way to show them outside the status
+	// line; a write error is swallowed, the status line matters more.
 	_ = saveSnapshot(input.RateLimits)
 
-	// Панель на Divoom живёт, только пока запущен мост. Поднимаем его отсюда:
-	// проверка занимает миллисекунды, а без Times Gate в сети не делает ничего.
+	// The Divoom panel lives only while the bridge is running. Start it from
+	// here: the check takes milliseconds and does nothing without a Times Gate
+	// on the network.
 	divoom.EnsureRunning()
 
 	var parts []string
 
 	if name := input.Model.DisplayName; name != "" {
-		// Уровень показываем рядом с моделью: заполненность круга читается
-		// и без цвета, а места занимает один символ вместо слова.
+		// The level goes next to the model: how full the circle is reads even
+		// without color, and it costs one character instead of a word.
 		if style, ok := effortStyles[input.Effort.Level]; ok {
 			name = colorized(name+" "+style.mark, style.color)
 		}
@@ -102,18 +104,18 @@ func statusline() {
 
 	if left, ok := secondsLeft(five.ResetsAt); ok {
 		elapsed := float64(fiveHourSeconds-left) / fiveHourSeconds * 100
-		parts = append(parts, fmt.Sprintf("сброс %s", labeledBar(elapsed, countdown(left), colorCyan)))
+		parts = append(parts, fmt.Sprintf("%s %s", i18n.T("reset"), labeledBar(elapsed, countdown(left), colorCyan)))
 	}
 
-	// Недельное окно уходит в конец: оно меняется медленно и мешает
-	// читать то, что важно прямо сейчас.
+	// The weekly window goes last: it moves slowly and gets in the way of what
+	// matters right now.
 	if week := parseWindow(input.RateLimits["seven_day"]); week.UsedPercentage != nil {
 		used := *week.UsedPercentage
 		parts = append(parts, fmt.Sprintf("7d %s", labeledBar(used, percentLabel(used), usageColor(used))))
 	}
 
-	// Значок обновления — в самом конце: он не про текущую сессию и не должен
-	// сдвигать цифры лимитов, к месту которых глаз уже привык.
+	// The update mark comes at the very end: it is not about the current
+	// session and must not shift the limit numbers the eye is already used to.
 	if tag, ok := updateAvailable(); ok {
 		parts = append(parts, colorized("↑ "+tag, colorUpdate))
 	}
@@ -125,17 +127,18 @@ func statusline() {
 	fmt.Println(strings.Join(parts, " · "))
 }
 
-// labeledBar рисует полосу, внутри которой по центру написан label. Фон идёт
-// на всю ширину — залитая часть цветом уровня, остаток тёмно-серым, — поэтому
-// граница полосы читается без рамки.
+// labeledBar draws a bar with label centered inside it. The background spans
+// the full width — the filled part in the level color, the rest dark grey — so
+// the edge of the bar reads without a frame.
 func labeledBar(percentage float64, label string, color int) string {
 	runes := []rune(label)
 	if len(runes) > barWidth {
 		runes = runes[:barWidth]
 	}
 
-	// Подпись нечётной длины ровно по центру не встаёт — остаётся лишний пробел.
-	// Кладём его слева: иначе «12%» и «39м» заметно съезжают к левому краю полосы.
+	// A label of odd length does not center exactly — one space is left over.
+	// Put it on the left: otherwise "12%" and "39m" drift noticeably towards
+	// the left edge of the bar.
 	pad := barWidth - len(runes)
 	left := (pad + 1) / 2
 	text := []rune(strings.Repeat(" ", left) + string(runes) + strings.Repeat(" ", pad-left))
@@ -168,8 +171,8 @@ func colorized(text string, color int) string {
 	return fmt.Sprintf("\x1b[1;38;5;%dm%s\x1b[0m", color, text)
 }
 
-// percentLabel не выравнивает число по правому краю: ведущие пробелы попали бы
-// внутрь подписи и сдвинули её вправо от центра полосы.
+// percentLabel does not right-align the number: leading spaces would end up
+// inside the label and push it right of the bar center.
 func percentLabel(percentage float64) string {
 	return fmt.Sprintf("%.0f%%", percentage)
 }
@@ -178,8 +181,8 @@ func secondsLeft(resetsAt *float64) (int, bool) {
 	if resetsAt == nil {
 		return 0, false
 	}
-	// Текущее время берём дробным, иначе остаток округляется вверх
-	// и обратный отсчёт показывает лишнюю минуту.
+	// Take the current time as a fraction, otherwise the remainder rounds up
+	// and the countdown shows one minute too many.
 	now := float64(time.Now().UnixNano()) / 1e9
 	seconds := int(normalizeEpoch(*resetsAt) - now)
 	if seconds <= 0 {
@@ -188,15 +191,16 @@ func secondsLeft(resetsAt *float64) (int, bool) {
 	return seconds, true
 }
 
-// countdown пишет часы даже нулевые: без них подпись на переходе через час
-// сжимается с шести символов до трёх и цифры прыгают к центру полосы.
+// countdown prints the hours even when they are zero: without them the label
+// shrinks from six characters to three as it crosses an hour, and the digits
+// jump towards the center of the bar.
 func countdown(seconds int) string {
 	minutes := seconds / 60
 	hours, minutes := minutes/60, minutes%60
-	return fmt.Sprintf("%dч %02dм", hours, minutes)
+	return fmt.Sprintf(i18n.T("%dh %02dm"), hours, minutes)
 }
 
-// normalizeEpoch принимает Unix-время в секундах или миллисекундах.
+// normalizeEpoch accepts Unix time in seconds or in milliseconds.
 func normalizeEpoch(value float64) float64 {
 	if value > 1e12 {
 		return value / 1000

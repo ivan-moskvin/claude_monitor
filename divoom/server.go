@@ -8,23 +8,26 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/ivan-moskvin/claude_monitor/i18n"
 )
 
-// Сколько прошлых кадров держим доступными. Устройство приходит за файлом
-// с задержкой и может перечитать его после своей перезагрузки — если ссылка
-// к тому моменту протухнет, на экране останется пустота.
+// How many past frames are kept available. The device comes for the file with a
+// delay and may re-read it after a reboot of its own — if the link has gone
+// stale by then, the screen is left empty.
 const keepFrames = 3
 
-// assets — HTTP-сервер, с которого устройство забирает кадры. Порт постоянный:
-// после перезапуска моста на экране висит ссылка со старого запуска.
+// assets — the HTTP server the device takes the frames from. The port stays the
+// same: after the bridge restarts, the screen still holds a link from the
+// previous run.
 type assets struct {
 	port int
-	// Кому позволено забирать кадр: панель показывает расход лимитов, а в
-	// подсети кафе соседей столько же, сколько устройств.
+	// Who is allowed to take a frame: the panel shows limit usage, and in a
+	// café subnet there are as many neighbours as devices.
 	allowIP string
-	// Пути, за которыми устройство уже приходило. Команда доставляется
-	// мгновенно, а картинка едет отдельным запросом — и только он
-	// доказывает, что кадр реально забрали.
+	// The paths the device has already come for. The command is delivered
+	// instantly while the picture travels in a separate request — and only that
+	// request proves the frame was really taken.
 	fetched chan string
 
 	mu     sync.Mutex
@@ -36,7 +39,7 @@ func newAssets(port int, allowIP string) *assets {
 	return &assets{port: port, allowIP: allowIP, frames: make(map[string][]byte), fetched: make(chan string, 8)}
 }
 
-// awaitFetch ждёт, пока устройство заберёт кадр по этой ссылке.
+// awaitFetch waits until the device has taken the frame behind this link.
 func (a *assets) awaitFetch(url string, timeout time.Duration) bool {
 	deadline := time.After(timeout)
 	for {
@@ -51,26 +54,28 @@ func (a *assets) awaitFetch(url string, timeout time.Duration) bool {
 	}
 }
 
-// listen занимает порт до первой команды устройству: молчаливый отказ сервера
-// оборачивается вечной загрузкой на экране без намёка на причину.
+// listen takes the port before the first command goes to the device: a server
+// that fails silently turns into endless loading on the screen with no hint of
+// the reason.
 func (a *assets) listen() error {
 	socket, err := net.Listen("tcp", ":"+strconv.Itoa(a.port))
 	if err != nil {
-		// Порт занят кем-то ещё — берём любой свободный и запоминаем его,
-		// чтобы после перезапуска моста ссылка на экране осталась рабочей.
+		// The port is taken by somebody else — grab any free one and remember
+		// it, so that the link on the screen keeps working after the bridge
+		// restarts.
 		socket, err = net.Listen("tcp", ":0")
 		if err != nil {
-			return fmt.Errorf("не удалось открыть порт для кадров: %w", err)
+			return fmt.Errorf(i18n.T("could not open a port for the frames: %w"), err)
 		}
 		a.port = socket.Addr().(*net.TCPAddr).Port
-		fmt.Printf("Порт занят, кадры отдаём на %d\n", a.port)
+		fmt.Printf(i18n.T("The port is taken, serving frames on %d\n"), a.port)
 	}
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", a.serve)
 
-	// Таймауты, чтобы подвисшее соединение не держало мост: обслуживаем мы
-	// одного клиента с одним маленьким файлом.
+	// Timeouts, so that a stuck connection does not hold the bridge: we serve
+	// one client with one small file.
 	server := &http.Server{
 		Handler:           mux,
 		ReadHeaderTimeout: 5 * time.Second,
@@ -110,9 +115,9 @@ func (a *assets) serve(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// publish кладёт кадр и отдаёт ссылку на него. Хэш в имени — то, что
-// заставляет устройство перекачать картинку: без смены адреса оно показывает
-// прежнюю.
+// publish stores a frame and returns the link to it. The hash in the name is
+// what makes the device re-download the picture: without a change of address it
+// shows the previous one.
 func (a *assets) publish(hostIP, hash string, data []byte) string {
 	path := "/panel-" + hash + ".gif"
 

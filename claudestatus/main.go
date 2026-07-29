@@ -1,8 +1,9 @@
-// Команда claudestatus — строка статуса с лимитами Claude и её же обслуживание.
+// Command claudestatus — the Claude limits status line, and its own upkeep.
 //
-// Без аргументов работает как statusLine-команда Claude Code: JSON сессии
-// приходит на stdin, строка статуса уходит в stdout. Подкоманды нужны только
-// человеку: прописать себя в настройки, проверить и поставить обновление.
+// With no arguments it behaves as a statusLine command for Claude Code: the
+// session JSON arrives on stdin, the status line goes to stdout. Subcommands
+// exist for the human only: register in the settings, check for an update and
+// install it.
 package main
 
 import (
@@ -10,27 +11,29 @@ import (
 	"os"
 
 	"github.com/ivan-moskvin/claude_monitor/divoom"
+	"github.com/ivan-moskvin/claude_monitor/i18n"
 )
 
-// Версия берётся из самого бинаря (см. version): у сборки не из тега номера
-// нет, поэтому значок обновления для неё не зажигается.
-const devVersion = "сборка из исходников"
+// The version is read from the binary itself (see version): a build made
+// outside a tag has no number, so the update mark never lights up for it.
+var devVersion = i18n.T("built from source")
 
-const usage = `claudestatus — лимиты Claude в строке статуса Claude Code.
+const usage = `claudestatus — Claude limits in the Claude Code status line.
 
-Использование:
-  claudestatus            строка статуса: JSON сессии на stdin, строка на stdout
-  claudestatus install    прописать себя в ~/.claude/settings.json
-  claudestatus check      проверить, вышла ли новая версия
-  claudestatus update     скачать последнюю версию и заменить себя ею
-  claudestatus uninstall  убрать строку статуса, кэш и сам бинарь
-  claudestatus divoom     панель лимитов на Divoom Times Gate (divoom help)
-  claudestatus completion оболочка: скрипт автодополнения (zsh|bash)
-  claudestatus version    показать версию
-  claudestatus help       эта справка
+Usage:
+  claudestatus            status line: session JSON on stdin, line on stdout
+  claudestatus install    register in ~/.claude/settings.json
+  claudestatus check      check whether a new version is out
+  claudestatus update     download the latest version and replace itself
+  claudestatus uninstall  remove the status line, the cache and the binary
+  claudestatus divoom     limits panel on a Divoom Times Gate (divoom help)
+  claudestatus completion shell: completion script (zsh|bash)
+  claudestatus version    print the version
+  claudestatus help       this help
 
-Переменные окружения:
-  CLAUDESTATUS_NO_AUTO_UPDATE=1   не проверять обновления в фоне
+Environment:
+  CLAUDESTATUS_LANG=ru|en         force the interface language
+  CLAUDESTATUS_NO_AUTO_UPDATE=1   do not check for updates in the background
 `
 
 func main() {
@@ -40,7 +43,7 @@ func main() {
 		return
 	}
 
-	// --install понимаем по-прежнему: он прописан в старых скриптах установки.
+	// --install is still understood: old install scripts spell it that way.
 	switch args[0] {
 	case "install", "--install":
 		exit(installSelf())
@@ -57,9 +60,9 @@ func main() {
 	case "version", "--version", "-v":
 		fmt.Println(version())
 	case "help", "--help", "-h":
-		fmt.Print(usage)
+		fmt.Print(i18n.T(usage))
 	default:
-		fmt.Fprintf(os.Stderr, "Неизвестная команда: %s\n\n%s", args[0], usage)
+		fmt.Fprintf(os.Stderr, i18n.T("Unknown command: %s\n\n%s"), args[0], i18n.T(usage))
 		os.Exit(2)
 	}
 }

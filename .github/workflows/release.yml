@@ -1,5 +1,5 @@
-# Собирает бинари на каждый тег vX.Y.Z и выкладывает их релизом: из него
-# качают и install.sh, и сама утилита при claudestatus update.
+# Builds the binaries on every vX.Y.Z tag and publishes them as a release: both
+# install.sh and the utility itself (claudestatus update) download from it.
 name: release
 
 on:
@@ -19,7 +19,7 @@ jobs:
         with:
           go-version-file: go.mod
 
-      - name: Сборка
+      - name: Build
         run: |
           set -eu
           mkdir dist
@@ -36,7 +36,7 @@ jobs:
           done
           cd dist && sha256sum * > checksums.txt
 
-      - name: Релиз
+      - name: Release
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh release create "$GITHUB_REF_NAME" dist/* --title "$GITHUB_REF_NAME" --generate-notes

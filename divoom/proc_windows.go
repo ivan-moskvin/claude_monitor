@@ -7,8 +7,9 @@ import (
 	"syscall"
 )
 
-// Windows-двойник proc_unix.go: сигналов здесь нет, процесс завершается
-// жёстко, поэтому экран возвращает не сам мост, а тот, кто его останавливает.
+// The Windows twin of proc_unix.go: there are no signals here, a process is
+// finished the hard way, so the screen is restored not by the bridge itself but
+// by whoever stops it.
 const gracefulStop = false
 
 const (
@@ -16,8 +17,8 @@ const (
 	createNewProcessGrp = 0x00000200
 )
 
-// detachAttrs запускает мост без консольного окна и вне группы процессов
-// вызвавшего — тот же смысл, что у Setsid на Unix.
+// detachAttrs starts the bridge without a console window and outside the
+// process group of the caller — the same meaning Setsid has on Unix.
 func detachAttrs() *syscall.SysProcAttr {
 	return &syscall.SysProcAttr{
 		HideWindow:    true,
@@ -25,8 +26,8 @@ func detachAttrs() *syscall.SysProcAttr {
 	}
 }
 
-// processAlive — на Windows FindProcess открывает описатель процесса и
-// возвращает ошибку, если такого больше нет.
+// processAlive — on Windows FindProcess opens a handle to the process and
+// returns an error when there is no such process any more.
 func processAlive(pid int) bool {
 	process, err := os.FindProcess(pid)
 	if err != nil {
@@ -36,8 +37,9 @@ func processAlive(pid int) bool {
 	return true
 }
 
-// terminate завершает процесс: мягкого варианта на Windows нет, поэтому он
-// совпадает с forceKill, а прибраться за мостом придётся вызывающему.
+// terminate finishes the process: there is no gentle variant on Windows, so it
+// coincides with forceKill, and cleaning up after the bridge is left to the
+// caller.
 func terminate(pid int) error {
 	return forceKill(pid)
 }

@@ -10,13 +10,16 @@ import (
 	"image/gif"
 	"math"
 	"time"
+
+	"github.com/ivan-moskvin/claude_monitor/i18n"
 )
 
-// Устройство принимает GIF размером 16, 32, 64 или 128 пикселей.
+// The device accepts a GIF sized 16, 32, 64 or 128 pixels.
 const panelSize = 128
 
-// Индексы палитры. Нулевой индекс устройство показывает как чёрный, поэтому
-// фон занимает именно его — иначе фоновый цвет пришлось бы отдельно защищать.
+// Palette indices. The device shows index zero as black, so the background
+// takes exactly that one — otherwise the background color would need protecting
+// separately.
 const (
 	idxBackground uint8 = iota
 	idxTrack
@@ -29,10 +32,10 @@ const (
 	idxClaude
 )
 
-// Цвета — те же, что в строке статуса, из 256-цветной палитры терминала:
-// 35 зелёный, 214 оранжевый, 167 красный, 38 циан, 237 фон пустой части,
-// 250 текст на ней. Панель и строка статуса показывают одно и то же, и
-// расходиться в цвете им незачем.
+// The colors are the ones from the status line, out of the 256-color terminal
+// palette: 35 green, 214 orange, 167 red, 38 cyan, 237 the background of the
+// empty part, 250 the text on it. The panel and the status line show the same
+// thing, and have no reason to differ in color.
 var palette = color.Palette{
 	color.RGBA{0x00, 0x00, 0x00, 0xff},
 	color.RGBA{0x3a, 0x3a, 0x3a, 0xff},
@@ -65,9 +68,10 @@ func (p *panel) fillRect(x, y, w, h int, idx uint8) {
 	}
 }
 
-// drawBar рисует полосу расхода: фон на всю ширину, залитая часть цветом
-// уровня, подпись по центру внутри. Та же схема, что в строке статуса —
-// граница полосы читается без рамки, а число не уезжает от неё в сторону.
+// drawBar draws a usage bar: the track across the full width, the filled part
+// in the level color, the label centered inside. The same scheme as in the
+// status line — the edge of the bar reads without a frame, and the number does
+// not drift away from it.
 func (p *panel) drawBar(x, y, w, h int, fraction float64, fill uint8, label string) {
 	fraction = math.Max(0, math.Min(1, fraction))
 	filled := int(math.Round(float64(w) * fraction))
@@ -79,9 +83,9 @@ func (p *panel) drawBar(x, y, w, h int, fraction float64, fill uint8, label stri
 	textX := x + (w-textWidth(label, labelScale))/2
 	textY := y + (h-glyphHeight*labelScale)/2
 
-	// На залитом фоне подпись тёмная, на пустом — светло-серая. Исключение —
-	// красный: он достаточно тёмный, чтобы чёрные цифры на нём тонули, и в
-	// строке статуса на нём тоже пишут белым.
+	// On the filled background the label is dark, on the empty one light grey.
+	// Red is the exception: it is dark enough for black digits to drown in it,
+	// and the status line writes on it in white too.
 	onFill := idxBackground
 	if fill == idxRed {
 		onFill = idxWhite
@@ -89,19 +93,20 @@ func (p *panel) drawBar(x, y, w, h int, fraction float64, fill uint8, label stri
 	p.drawTextSplit(label, textX, textY, labelScale, x+filled, onFill, idxGrey)
 }
 
-// encode отдаёт GIF и его хэш: хэш попадает в имя файла, поэтому устройство
-// перекачивает картинку только когда она действительно изменилась.
+// encode returns the GIF and its hash: the hash goes into the file name, so the
+// device re-downloads the picture only when it really changed.
 func (p *panel) encode() ([]byte, string, error) {
 	var buf bytes.Buffer
 	if err := gif.Encode(&buf, p.img, nil); err != nil {
-		return nil, "", fmt.Errorf("не удалось закодировать GIF: %w", err)
+		return nil, "", fmt.Errorf(i18n.T("could not encode the GIF: %w"), err)
 	}
 	data := buf.Bytes()
 	sum := sha256.Sum256(data)
 	return data, hex.EncodeToString(sum[:8]), nil
 }
 
-// Раскладка: сверху заголовок с искрой Claude, ниже три полосы с метками слева.
+// Layout: the header with the Claude sparkle on top, three bars with their
+// labels on the left below it.
 const (
 	labelX    = 6
 	labelWide = 22
@@ -115,9 +120,10 @@ const (
 	resetIcon = 15
 )
 
-// drawResetIcon рисует круговую стрелку — метку строки со временем до сброса.
-// Соседние «5H» и «7D» говорят про расход, здесь величина другая, и знак
-// отличает её лучше, чем ещё одна пара букв.
+// drawResetIcon draws a circular arrow — the mark of the row with the time left
+// until the reset. The neighbouring "5H" and "7D" talk about usage, here the
+// quantity is a different one, and a sign tells it apart better than yet
+// another pair of letters.
 func (p *panel) drawResetIcon(x, y, size int, idx uint8) {
 	radius := float64(size) / 2
 	center := radius - 0.5
@@ -130,7 +136,8 @@ func (p *panel) drawResetIcon(x, y, size int, idx uint8) {
 				continue
 			}
 
-			// Разрыв кольца справа сверху — там начинается наконечник.
+			// The ring is broken at the upper right — that is where the arrow
+			// head starts.
 			angle := math.Atan2(ox, -oy)
 			if angle > 0.2 && angle < 1.5 {
 				continue
@@ -139,7 +146,7 @@ func (p *panel) drawResetIcon(x, y, size int, idx uint8) {
 		}
 	}
 
-	// Наконечник стрелки у разрыва: три ряда, сужающиеся вправо.
+	// The arrow head at the break: three rows narrowing to the right.
 	tipX, tipY := x+size/2, y
 	for row := 0; row < 3; row++ {
 		p.fillRect(tipX+row, tipY+row, 3-row, 1, idx)
@@ -147,8 +154,8 @@ func (p *panel) drawResetIcon(x, y, size int, idx uint8) {
 	}
 }
 
-// drawSparkle рисует искру Claude: четыре длинных луча по осям и четыре
-// коротких по диагоналям.
+// drawSparkle draws the Claude sparkle: four long rays along the axes and four
+// short ones along the diagonals.
 func (p *panel) drawSparkle(x, y, size int, idx uint8) {
 	radius := size / 2
 
@@ -160,9 +167,9 @@ func (p *panel) drawSparkle(x, y, size int, idx uint8) {
 				continue
 			}
 
-			// Лепесток тем шире, чем ближе к центру: у осевых лучей запас
-			// больше, диагональные вдвое короче — так искра не превращается
-			// в равномерную звезду.
+			// A petal is the wider the closer it is to the center: the axial
+			// rays have more room, the diagonal ones are half as long — that
+			// keeps the sparkle from turning into an even star.
 			axial := ax <= (float64(radius)-ay)/2.6 || ay <= (float64(radius)-ax)/2.6
 			diagonal := math.Abs(ax-ay) <= (float64(radius)-math.Max(ax, ay))/2.6 &&
 				distance <= float64(radius)*0.82
@@ -174,18 +181,19 @@ func (p *panel) drawSparkle(x, y, size int, idx uint8) {
 	}
 }
 
-// render собирает панель по снимку лимитов — тремя полосами, как в строке
-// статуса: сначала то, что кончится раньше, недельное окно в конце.
+// render builds the panel out of the usage snapshot — three bars, as in the
+// status line: whatever runs out first comes first, the weekly window last.
 func render(state snapshot) ([]byte, string, error) {
 	p := newPanel()
 
 	p.drawSparkle(labelX, headerY, sparkSize, idxClaude)
 	p.drawText("CLAUDE", labelX+sparkSize+7, headerY+(sparkSize-glyphHeight*2)/2, 2, idxWhite)
 
-	// Данные растут только в активной сессии Claude Code: если снапшот давно
-	// не обновлялся, проценты ниже описывают прошлое, и это должно быть видно.
-	// Кегль мельче заголовка: иначе метка встаёт к нему вплотную и читается
-	// как продолжение слова — «CLAUDE2М».
+	// The numbers only grow during an active Claude Code session: if the
+	// snapshot has not been updated for a while, the percentages below describe
+	// the past, and that has to be visible. Smaller than the header: otherwise
+	// the mark stands right against it and reads as part of the word —
+	// "CLAUDE2H".
 	if state.stale {
 		const ageScale = 1
 		label := ageLabel(state.age)
@@ -194,8 +202,8 @@ func render(state snapshot) ([]byte, string, error) {
 	}
 
 	if state.err != "" {
-		p.drawTextCentered("НЕТ", 52, 3, idxGrey)
-		p.drawTextCentered("ДАННЫХ", 86, 2, idxGrey)
+		p.drawTextCentered(i18n.T("NO"), 52, 3, idxGrey)
+		p.drawTextCentered(i18n.T("DATA"), 86, 2, idxGrey)
 		return p.encode()
 	}
 
@@ -216,12 +224,12 @@ func render(state snapshot) ([]byte, string, error) {
 	return p.encode()
 }
 
-// resetLabel — что писать в полосе сброса. Возраст снапшота сюда не
-// вмешивается: время до сброса считается от абсолютной метки resets_at
-// и тикает верно, даже когда расход давно не обновлялся.
+// resetLabel — what to write inside the reset bar. The age of the snapshot does
+// not interfere here: the time left is counted from the absolute resets_at mark
+// and ticks correctly even when usage has not been updated for a long while.
 func resetLabel(five usageWindow) string {
 	if five.expired {
-		return "СБРОС"
+		return i18n.T("RESET")
 	}
 	return countdownLabel(five.secondsLeft)
 }
@@ -233,18 +241,20 @@ func resetTint(five usageWindow) uint8 {
 	return idxCyan
 }
 
-// ageLabel — сколько снапшот не обновлялся. Проценты расхода за это время
-// могли вырасти, поэтому метка стоит у заголовка, а не у цифр окна.
+// ageLabel — how long the snapshot has not been updated. The usage percentages
+// may have grown in the meantime, which is why the mark stands by the header
+// and not by the numbers of a window.
 func ageLabel(age time.Duration) string {
 	if hours := int(age.Hours()); hours > 0 {
-		return fmt.Sprintf("%dЧ", hours)
+		return fmt.Sprintf(i18n.T("%dH"), hours)
 	}
-	return fmt.Sprintf("%dМ", int(age.Minutes()))
+	return fmt.Sprintf(i18n.T("%dM"), int(age.Minutes()))
 }
 
-// countdownLabel — «2:41» до сброса окна. В строке статуса время подписано
-// буквами, но в шрифте 5×7 «Ч» неотличима от четвёрки: «2Ч 41М» читается
-// как «24 41М». Двоеточие спутать не с чем.
+// countdownLabel — "2:41" until the window resets. The status line spells the
+// time with letters, but in a 5×7 grid the Russian letter for an hour is
+// indistinguishable from a four, and the label reads as "24 41M". A colon can
+// be mistaken for nothing and needs no translation.
 func countdownLabel(seconds int) string {
 	if seconds <= 0 {
 		return "-"

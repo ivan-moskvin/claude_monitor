@@ -2,7 +2,4 @@
 .idea/
 
 bin/
-<<<<<<< HEAD
-=======
 claude-divoom
->>>>>>> 93c4142 (feat: мост divoom подкомандой claudestatus divoom)

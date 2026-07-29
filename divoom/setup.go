@@ -3,9 +3,11 @@ package divoom
 import (
 	"fmt"
 	"os"
+
+	"github.com/ivan-moskvin/claude_monitor/i18n"
 )
 
-// on находит Times Gate в сети и включает панель.
+// on finds the Times Gate on the network and turns the panel on.
 func on() error {
 	ip, name, deviceID, err := discover()
 	if err != nil {
@@ -21,16 +23,17 @@ func on() error {
 		return err
 	}
 
-	fmt.Printf("Найдено устройство %s: %s\n", name, ip)
+	fmt.Printf(i18n.T("Found device %s: %s\n"), name, ip)
 
 	EnsureRunning()
 	if running() {
-		fmt.Printf("Панель включена на экране %d\n", cfg.LcdIndex+1)
+		fmt.Printf(i18n.T("The panel is on, screen %d\n"), cfg.LcdIndex+1)
 	}
 	return nil
 }
 
-// off убирает панель: возвращает экрану его циферблат и забывает устройство.
+// off takes the panel away: gives the screen its clock face back and forgets
+// the device.
 func off() error {
 	if running() {
 		Stop()
@@ -45,6 +48,6 @@ func off() error {
 	if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
 		return err
 	}
-	fmt.Println("Панель выключена, экрану возвращён его циферблат")
+	fmt.Println(i18n.T("The panel is off, the screen got its clock face back"))
 	return nil
 }

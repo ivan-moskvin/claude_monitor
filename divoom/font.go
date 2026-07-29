@@ -1,8 +1,12 @@
 package divoom
 
-// Битмапный шрифт 5×7. Панель — 128×128 пикселей, шрифтовых движков в
-// зависимостях нет и не нужно: цифр, процента и пары букв хватает на всё,
-// что помещается на такой экран.
+// A 5×7 bitmap font. The panel is 128×128 pixels, there is no font engine among
+// the dependencies and none is needed: digits, a percent sign and a handful of
+// letters cover everything that fits on such a screen.
+//
+// Every character the panel can draw must be in here — an unknown rune falls
+// back to "?" and the screen shows nonsense. Hence the Cyrillic block: on a
+// Russian system the panel labels its bars in Russian.
 var glyphs = map[rune][7]string{
 	'0': {"01110", "10001", "10011", "10101", "11001", "10001", "01110"},
 	'1': {"00100", "01100", "00100", "00100", "00100", "00100", "01110"},
@@ -22,9 +26,11 @@ var glyphs = map[rune][7]string{
 	'H': {"10001", "10001", "10001", "11111", "10001", "10001", "10001"},
 	'D': {"11110", "10001", "10001", "10001", "10001", "10001", "11110"},
 	'W': {"10001", "10001", "10001", "10101", "10101", "11011", "10001"},
+	'M': {"10001", "11011", "10101", "10001", "10001", "10001", "10001"},
 	'N': {"10001", "11001", "10101", "10101", "10011", "10001", "10001"},
 	'O': {"01110", "10001", "10001", "10001", "10001", "10001", "01110"},
 	'P': {"11110", "10001", "10001", "11110", "10000", "10000", "10000"},
+	'R': {"11110", "10001", "10001", "11110", "10100", "10010", "10001"},
 	'U': {"10001", "10001", "10001", "10001", "10001", "10001", "01110"},
 	'S': {"01111", "10000", "10000", "01110", "00001", "00001", "11110"},
 	'E': {"11111", "10000", "10000", "11110", "10000", "10000", "11111"},
@@ -33,7 +39,6 @@ var glyphs = map[rune][7]string{
 	'L': {"10000", "10000", "10000", "10000", "10000", "10000", "11111"},
 	'?': {"01110", "10001", "00001", "00010", "00100", "00000", "00100"},
 	' ': {"00000", "00000", "00000", "00000", "00000", "00000", "00000"},
-	// Подписи на панели русские, как и весь интерфейс проекта.
 	'Ч': {"10001", "10001", "10001", "01111", "00001", "00001", "00001"},
 	'М': {"10001", "11011", "10101", "10001", "10001", "10001", "10001"},
 	'Д': {"00111", "00101", "00101", "01001", "01001", "11111", "10001"},
@@ -54,7 +59,7 @@ const (
 	glyphHeight = 7
 )
 
-// textWidth — ширина строки в пикселях: между глифами один пиксель.
+// textWidth — the width of a string in pixels: one pixel between the glyphs.
 func textWidth(text string, scale int) int {
 	runes := []rune(text)
 	if len(runes) == 0 {
@@ -67,9 +72,9 @@ func (p *panel) drawText(text string, x, y, scale int, idx uint8) {
 	p.drawTextSplit(text, x, y, scale, panelSize, idx, idx)
 }
 
-// drawTextSplit красит текст двумя цветами: левее splitX одним, правее другим.
-// Так подпись остаётся читаемой, когда полоса заполнена наполовину и буква
-// стоит ровно на границе залитой и пустой части.
+// drawTextSplit paints the text in two colors: left of splitX in one, right of
+// it in the other. That keeps the label readable when the bar is half full and
+// a letter stands right on the border between the filled and the empty part.
 func (p *panel) drawTextSplit(text string, x, y, scale, splitX int, left, right uint8) {
 	cursor := x
 	for _, r := range text {
