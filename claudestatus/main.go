@@ -20,7 +20,8 @@ const usage = `claudestatus — лимиты Claude в строке статус
   claudestatus            строка статуса: JSON сессии на stdin, строка на stdout
   claudestatus install    прописать себя в ~/.claude/settings.json
   claudestatus check      проверить, вышла ли новая версия
-  claudestatus update     переустановить себя последней версией
+  claudestatus update     скачать последнюю версию и заменить себя ею
+  claudestatus uninstall  убрать строку статуса, кэш и сам бинарь
   claudestatus version    показать версию
   claudestatus help       эта справка
 
@@ -43,6 +44,8 @@ func main() {
 		exit(check(hasFlag(args[1:], "--quiet")))
 	case "update":
 		exit(update())
+	case "uninstall":
+		exit(uninstall())
 	case "version", "--version", "-v":
 		fmt.Println(version())
 	case "help", "--help", "-h":

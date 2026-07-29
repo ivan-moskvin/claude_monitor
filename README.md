@@ -5,16 +5,22 @@
 ## Установка
 
 ```bash
-go install github.com/ivan-moskvin/claude_monitor/claudestatus@latest
-claudestatus install
+curl -fsSL https://raw.githubusercontent.com/ivan-moskvin/claude_monitor/main/install.sh | sh
 ```
 
-Нужен `go`: `brew install go`, в Windows — `winget install GoLang.Go`.
+Windows (PowerShell):
 
-Первая команда кладёт бинарь в `~/go/bin`, вторая прописывает его
-в `~/.claude/settings.json` — прежние настройки сохраняются рядом,
-в `settings.json.bak`. Если `~/go/bin` нет в PATH, `install` подскажет строку
-для `~/.zshrc`. Строка статуса появится в следующей сессии Claude Code.
+```powershell
+irm https://raw.githubusercontent.com/ivan-moskvin/claude_monitor/main/install.ps1 | iex
+```
+
+Скрипт качает готовый бинарь последнего релиза, сверяет контрольную сумму, кладёт
+его в `~/.local/bin` (Windows — в `%LOCALAPPDATA%\claudestatus` и добавляет каталог
+в PATH) и прописывает строку статуса в `~/.claude/settings.json` — прежние настройки
+сохраняются рядом, в `settings.json.bak`. Другой каталог — `CLAUDESTATUS_BIN_DIR`.
+
+Ничего доустанавливать не нужно: ни Go, ни компилятора. Строка статуса появится
+в следующей сессии Claude Code.
 
 ## Обновление
 
@@ -22,10 +28,18 @@ claudestatus install
 claudestatus update
 ```
 
-Утилита узнаёт последнюю версию и переустанавливает себя ею — клон репозитория
-для этого не нужен. Проверяет она и сама: при первом за час вызове строки статуса,
-в фоне. Вышла новая версия — в строке загорается `↑ v1.2.3`. Отключить проверку:
+Утилита качает бинарь нового релиза и заменяет себя им; перезапускать Claude Code
+не нужно. Проверяет она и сама — при первом за час вызове строки статуса, в фоне.
+Вышла новая версия — в строке загорается `↑ v1.2.3`. Отключить проверку:
 `CLAUDESTATUS_NO_AUTO_UPDATE=1`.
+
+## Удаление
+
+```bash
+claudestatus uninstall
+```
+
+Убирает строку статуса из настроек, кэш проверок и сам бинарь.
 
 ## Команды
 
@@ -33,7 +47,8 @@ claudestatus update
 claudestatus            строка статуса: JSON сессии на stdin, строка на stdout
 claudestatus install    прописать себя в ~/.claude/settings.json
 claudestatus check      проверить, вышла ли новая версия
-claudestatus update     переустановить себя последней версией
+claudestatus update     скачать последнюю версию и заменить себя ею
+claudestatus uninstall  убрать строку статуса, кэш и сам бинарь
 claudestatus version    показать версию
 ```
 
@@ -50,7 +65,7 @@ claudestatus version    показать версию
 Лимиты приходят от самого Claude Code: он подаёт statusline-команде JSON сессии
 на stdin, а `rate_limits` оттуда и печатаются. Никаких запросов к API Anthropic,
 токенов и обращений к Keychain — исходники открыты, чтобы это можно было проверить.
-Единственный сетевой запрос — номер последней версии у `proxy.golang.org`, того же
-прокси, через который утилита ставится.
+В сеть утилита ходит только к GitHub: узнать версию последнего релиза и скачать
+из него бинарь.
 
 Цифры обновляются только пока идёт сессия: строку статуса рисует сам Claude Code.
