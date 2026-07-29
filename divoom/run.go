@@ -150,15 +150,29 @@ func run(once bool) error {
 		return nil
 	}
 
+	// Второй мост на то же устройство слал бы кадры вперемешку с первым.
+	if err := takeLock(); err != nil {
+		return err
+	}
+	defer dropLock()
+
 	fmt.Printf("Панель на экране %d устройства %s, обновление каждые %s\n",
 		cfg.LcdIndex, cfg.IP, pollInterval)
 
-	// Ошибки в цикле не роняют мост: устройство могли выключить на ночь,
-	// а мост должен сам подхватить его обратно.
+	// Ошибки в цикле не роняют мост: устройство могли выключить на ночь.
+	// Но и висеть вечно рядом с выключенным устройством незачем — после
+	// giveUpAfter мост уходит, а строка статуса поднимет его, когда Times Gate
+	// вернётся в сеть.
+	lastSeen := time.Now()
 	for range time.Tick(pollInterval) {
 		if err := send(false); err != nil {
 			fmt.Fprintln(os.Stderr, err)
+			if time.Since(lastSeen) > giveUpAfter {
+				return fmt.Errorf("устройство недоступно дольше %s, выхожу", giveUpAfter)
+			}
+			continue
 		}
+		lastSeen = time.Now()
 	}
 	return nil
 }
