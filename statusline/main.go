@@ -129,8 +129,11 @@ func labeledBar(percentage float64, label string, color int) string {
 		runes = runes[:barWidth]
 	}
 
+	// Подпись нечётной длины ровно по центру не встаёт — остаётся лишний пробел.
+	// Кладём его слева: иначе «12%» и «39м» заметно съезжают к левому краю полосы.
 	pad := barWidth - len(runes)
-	text := []rune(strings.Repeat(" ", pad/2) + string(runes) + strings.Repeat(" ", pad-pad/2))
+	left := (pad + 1) / 2
+	text := []rune(strings.Repeat(" ", left) + string(runes) + strings.Repeat(" ", pad-left))
 
 	filled := int(math.RoundToEven(percentage / 100 * barWidth))
 	filled = max(0, min(barWidth, filled))
