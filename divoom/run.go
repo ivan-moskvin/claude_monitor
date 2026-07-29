@@ -179,7 +179,7 @@ func run(once bool) error {
 	// По сигналу возвращаем экрану прежний циферблат: иначе на нём останется
 	// последний кадр, за которым уже некому приходить.
 	stopping := make(chan os.Signal, 1)
-	signal.Notify(stopping, syscall.SIGTERM, syscall.SIGINT)
+	signal.Notify(stopping, os.Interrupt, syscall.SIGTERM)
 	go func() {
 		<-stopping
 		_ = target.restoreScreen(cfg.PrevClockID, cfg.PrevIndependence)
