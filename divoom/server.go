@@ -23,7 +23,8 @@ const keepFrames = 3
 type assets struct {
 	port int
 	// Who is allowed to take a frame: the panel shows limit usage, and in a
-	// café subnet there are as many neighbours as devices.
+	// café subnet there are as many neighbours as devices. Guarded by mu — the
+	// device may be found at another address while the server is serving.
 	allowIP string
 	// The paths the device has already come for. The command is delivered
 	// instantly while the picture travels in a separate request — and only that
@@ -86,8 +87,19 @@ func (a *assets) listen() error {
 	return nil
 }
 
+// allow points the server at the address the device answers on now.
+func (a *assets) allow(ip string) {
+	a.mu.Lock()
+	a.allowIP = ip
+	a.mu.Unlock()
+}
+
 func (a *assets) serve(w http.ResponseWriter, r *http.Request) {
-	if host, _, err := net.SplitHostPort(r.RemoteAddr); err != nil || (a.allowIP != "" && host != a.allowIP) {
+	a.mu.Lock()
+	allowIP := a.allowIP
+	a.mu.Unlock()
+
+	if host, _, err := net.SplitHostPort(r.RemoteAddr); err != nil || (allowIP != "" && host != allowIP) {
 		http.NotFound(w, r)
 		return
 	}

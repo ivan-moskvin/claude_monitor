@@ -12,10 +12,6 @@ import (
 	"github.com/ivan-moskvin/claude_monitor/i18n"
 )
 
-// The cloud directory: it answers with the devices sitting behind the same
-// public address. No authorization required.
-const lanDirectory = "https://app.divoom-gz.com/Device/ReturnSameLANDevice"
-
 type device struct {
 	ip  string
 	lcd int
@@ -108,32 +104,6 @@ func (d device) restoreScreen(clockID, independence int) error {
 		"LcdIndex":        d.lcd,
 		"ClockId":         clockID,
 	})
-}
-
-func discover() (ip string, name string, deviceID int, err error) {
-	client := http.Client{Timeout: 15 * time.Second}
-	response, err := client.Post(lanDirectory, "application/json", bytes.NewReader([]byte("{}")))
-	if err != nil {
-		return "", "", 0, fmt.Errorf(i18n.T("the device directory is unreachable: %w"), err)
-	}
-	defer response.Body.Close()
-
-	var result struct {
-		DeviceList []struct {
-			DeviceName      string `json:"DeviceName"`
-			DevicePrivateIP string `json:"DevicePrivateIP"`
-			DeviceID        int    `json:"DeviceId"`
-		} `json:"DeviceList"`
-	}
-	if err := json.NewDecoder(response.Body).Decode(&result); err != nil {
-		return "", "", 0, err
-	}
-	if len(result.DeviceList) == 0 {
-		return "", "", 0, errors.New(i18n.T("no Divoom devices are visible on this network"))
-	}
-
-	first := result.DeviceList[0]
-	return first.DevicePrivateIP, first.DeviceName, first.DeviceID, nil
 }
 
 // localIP — the address the device will see us at. The UDP connection sends

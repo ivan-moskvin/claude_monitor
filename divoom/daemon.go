@@ -35,7 +35,7 @@ func lockPath() (string, error) {
 // keep quiet: no trouble here is worth spoiling the line.
 func EnsureRunning() {
 	cfg, err := loadConfig()
-	if err != nil || cfg.IP == "" {
+	if err != nil || cfg.IP == "" || !cfg.enabled() {
 		// The panel is not turned on — not an error, most people have no Times
 		// Gate.
 		return
@@ -43,7 +43,7 @@ func EnsureRunning() {
 	if running() {
 		return
 	}
-	if cfg.IP == "" || !reachable(cfg.IP) {
+	if !reachable(cfg.IP) {
 		return
 	}
 

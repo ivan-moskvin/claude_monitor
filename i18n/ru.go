@@ -160,7 +160,7 @@ compdef _claudestatus claudestatus
 	`claudestatus divoom — limits panel on the screen of a Divoom Times Gate.
 
 Usage:
-  claudestatus divoom on           find the Times Gate on the network and turn the panel on
+  claudestatus divoom on [N]       find the Divoom devices and turn the panel on device N
   claudestatus divoom off          turn the panel off and give the screen its clock face back
   claudestatus divoom              keep the panel updated (works while running)
   claudestatus divoom once         send the panel once and exit
@@ -171,7 +171,7 @@ The settings are divoom.json in the application directory, created by on.
 `: `claudestatus divoom — панель лимитов на экране Divoom Times Gate.
 
 Использование:
-  claudestatus divoom on           найти Times Gate в сети и включить панель
+  claudestatus divoom on [N]       найти устройства Divoom и включить панель на устройстве N
   claudestatus divoom off          выключить панель и вернуть экрану циферблат
   claudestatus divoom              держать панель обновлённой (работает, пока запущен)
   claudestatus divoom once         отправить панель один раз и выйти
@@ -184,34 +184,40 @@ The settings are divoom.json in the application directory, created by on.
 	"unknown command: %s\n\n%s":                          "неизвестная команда: %s\n\n%s",
 
 	// divoom: device and bridge
-	"Found device %s: %s\n": "Найдено устройство %s: %s\n",
-	"could not determine our own address on the device network: %w": "не удалось определить свой адрес в сети устройства: %w",
-	"the device did not take the frame within %s":                   "устройство не забрало кадр за %s",
-	"Panel on screen %d of device %s, updated every %s\n":           "Панель на экране %d устройства %s, обновление каждые %s\n",
-	"the device has been unreachable for more than %s, leaving":     "устройство недоступно дольше %s, выхожу",
-	"the panel is not turned on — claudestatus divoom on":           "панель не включена — claudestatus divoom on",
-	"%s does not parse: %w":                                         "%s не разбирается: %w",
-	"the device is unreachable: %w":                                 "устройство недоступно: %w",
-	"the device answered with something other than JSON: %w":        "устройство ответило не JSON: %w",
-	"the device rejected the command: %s":                           "устройство отклонило команду: %s",
-	"the device did not return its screen layout":                   "устройство не отдало раскладку экранов",
-	"the previous clock face is unknown":                            "прежний циферблат неизвестен",
-	"the device directory is unreachable: %w":                       "каталог устройств недоступен: %w",
-	"no Divoom devices are visible on this network":                 "устройств Divoom в этой сети не видно",
-	"could not open a port for the frames: %w":                      "не удалось открыть порт для кадров: %w",
-	"The port is taken, serving frames on %d\n":                     "Порт занят, кадры отдаём на %d\n",
-	"the bridge is already running":                                 "мост уже запущен",
-	"The Divoom bridge is stopped":                                  "Остановлен мост Divoom",
-	"The panel is on screen %d of %d\n":                             "Панель на экране %d из %d\n",
-	"the screen is a number from 1 to %d, not %q":                   "экран — число от 1 до %d, а не %q",
-	"The panel is on screen %d already\n":                           "Панель и так на экране %d\n",
-	"The panel moved to screen %d\n":                                "Панель переехала на экран %d\n",
-	"The panel is on, screen %d\n":                                  "Панель включена на экране %d\n",
-	"The panel is off, the screen got its clock face back":          "Панель выключена, экрану возвращён его циферблат",
-	"no snapshot found":                                             "снапшот не найден",
-	"the snapshot is damaged":                                       "снапшот повреждён",
-	"the snapshot holds no limits":                                  "лимитов в снапшоте нет",
-	"could not encode the GIF: %w":                                  "не удалось закодировать GIF: %w",
+	"Device %s: %s\n":                             "Устройство %s: %s\n",
+	"Divoom devices on the network:":              "Устройства Divoom в сети:",
+	"Divoom device":                               "устройство Divoom",
+	"Which one gets the panel? 1–%d: ":            "На какое повесить панель? 1–%d: ",
+	"the device is a number from 1 to %d, not %q": "устройство — число от 1 до %d, а не %q",
+	"there is more than one device — name the number: claudestatus divoom on N":      "устройств больше одного — укажите номер: claudestatus divoom on N",
+	"the chosen device is not on the network — choose again: claudestatus divoom on": "выбранного устройства нет в сети — выберите заново: claudestatus divoom on",
+	"could not determine our own address on the device network: %w":                  "не удалось определить свой адрес в сети устройства: %w",
+	"the device did not take the frame within %s":                                    "устройство не забрало кадр за %s",
+	"Panel on screen %d of device %s, updated every %s\n":                            "Панель на экране %d устройства %s, обновление каждые %s\n",
+	"the device has been unreachable for more than %s, leaving":                      "устройство недоступно дольше %s, выхожу",
+	"the panel is not turned on — claudestatus divoom on":                            "панель не включена — claudestatus divoom on",
+	"%s does not parse: %w":                                  "%s не разбирается: %w",
+	"the device is unreachable: %w":                          "устройство недоступно: %w",
+	"the device answered with something other than JSON: %w": "устройство ответило не JSON: %w",
+	"the device rejected the command: %s":                    "устройство отклонило команду: %s",
+	"the device did not return its screen layout":            "устройство не отдало раскладку экранов",
+	"the previous clock face is unknown":                     "прежний циферблат неизвестен",
+	"the device directory is unreachable: %w":                "каталог устройств недоступен: %w",
+	"no Divoom devices are visible on this network":          "устройств Divoom в этой сети не видно",
+	"could not open a port for the frames: %w":               "не удалось открыть порт для кадров: %w",
+	"The port is taken, serving frames on %d\n":              "Порт занят, кадры отдаём на %d\n",
+	"the bridge is already running":                          "мост уже запущен",
+	"The Divoom bridge is stopped":                           "Остановлен мост Divoom",
+	"The panel is on screen %d of %d\n":                      "Панель на экране %d из %d\n",
+	"the screen is a number from 1 to %d, not %q":            "экран — число от 1 до %d, а не %q",
+	"The panel is on screen %d already\n":                    "Панель и так на экране %d\n",
+	"The panel moved to screen %d\n":                         "Панель переехала на экран %d\n",
+	"The panel is on, screen %d\n":                           "Панель включена на экране %d\n",
+	"The panel is off, the screen got its clock face back":   "Панель выключена, экрану возвращён его циферблат",
+	"no snapshot found":                                      "снапшот не найден",
+	"the snapshot is damaged":                                "снапшот повреждён",
+	"the snapshot holds no limits":                           "лимитов в снапшоте нет",
+	"could not encode the GIF: %w":                           "не удалось закодировать GIF: %w",
 
 	// divoom: labels drawn on the panel itself. Every character here must have
 	// a glyph in font.go, and the string has to fit its bar at scale 2.

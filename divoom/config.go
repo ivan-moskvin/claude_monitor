@@ -16,20 +16,35 @@ const configName = "divoom.json"
 const defaultPort = 8477
 
 type config struct {
-	// The IP of the device. Empty — look for it on the network again.
+	// Whether the panel is turned on. `off` clears the flag but keeps the file:
+	// the chosen device and the chosen screen have to survive it, or every `on`
+	// would start over from the defaults. A config written before the flag
+	// existed carries no value and counts as on.
+	On *bool `json:"on,omitempty"`
+	// The last known IP of the device. DHCP moves it, so it is a hint for the
+	// search, never the answer.
 	IP string `json:"ip"`
 	// Screen 0–4, the one we hand the panel to. The others are left alone.
 	LcdIndex int `json:"lcd_index"`
 	// The port of the local server with the frames; if taken, a free one is used.
 	Port int `json:"port"`
-	// The id of the device in the Divoom cloud — the screen layout is looked up by it.
+	// The id of the device in the Divoom cloud — the screen layout is looked up
+	// by it, and it tells our device from the neighbouring ones after a move.
 	DeviceID int `json:"device_id,omitempty"`
+	// The MAC and the name of the chosen device: the MAC identifies it when the
+	// directory is silent, the name is what the human sees.
+	MAC  string `json:"mac,omitempty"`
+	Name string `json:"name,omitempty"`
 	// What was on our screen before us: the clock face and the set of screens it
 	// belongs to. Remembered on the first run and given back on uninstall —
 	// otherwise the screen is left with a dead picture once the bridge is gone.
 	PrevClockID      int `json:"prev_clock_id,omitempty"`
 	PrevIndependence int `json:"prev_independence,omitempty"`
 }
+
+// errNoConfig — the panel was never turned on. Told apart from a broken file:
+// that one has to be reported instead of quietly starting from the defaults.
+var errNoConfig = errors.New(i18n.T("the panel is not turned on — claudestatus divoom on"))
 
 func configPath() (string, error) {
 	return paths.File(configName)
@@ -46,7 +61,7 @@ func loadConfig() (config, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return cfg, errors.New(i18n.T("the panel is not turned on — claudestatus divoom on"))
+			return cfg, errNoConfig
 		}
 		return cfg, err
 	}
@@ -57,6 +72,14 @@ func loadConfig() (config, error) {
 		cfg.Port = defaultPort
 	}
 	return cfg, nil
+}
+
+func (c config) enabled() bool {
+	return c.On == nil || *c.On
+}
+
+func (c *config) setOn(on bool) {
+	c.On = &on
 }
 
 func (c config) save() error {

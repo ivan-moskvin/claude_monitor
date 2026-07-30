@@ -32,12 +32,15 @@ const (
 	resendAfter = 15 * time.Minute
 	// How long we wait for the device to come and take the frame.
 	fetchTimeout = 20 * time.Second
+	// How often a silent device is looked for at its new address. A sweep of
+	// the network is not free, and a DHCP lease does not change by the minute.
+	searchInterval = 2 * time.Minute
 )
 
 const usage = `claudestatus divoom — limits panel on the screen of a Divoom Times Gate.
 
 Usage:
-  claudestatus divoom on           find the Times Gate on the network and turn the panel on
+  claudestatus divoom on [N]       find the Divoom devices and turn the panel on device N
   claudestatus divoom off          turn the panel off and give the screen its clock face back
   claudestatus divoom              keep the panel updated (works while running)
   claudestatus divoom once         send the panel once and exit
@@ -56,7 +59,7 @@ func Run(args []string) error {
 
 	switch args[0] {
 	case "on":
-		return on()
+		return on(args[1:])
 	case "off":
 		return off()
 	case "once":
@@ -86,26 +89,14 @@ func run(once bool) error {
 		return err
 	}
 
-	if cfg.IP == "" {
-		ip, name, deviceID, err := discover()
-		if err != nil {
-			return err
-		}
-		fmt.Printf(i18n.T("Found device %s: %s\n"), name, ip)
-		cfg.IP, cfg.DeviceID = ip, deviceID
-		if err := cfg.save(); err != nil {
-			return err
-		}
+	if !cfg.enabled() {
+		return errNoConfig
 	}
 
-	// The device id may have missed the config: with a hand-written IP the
-	// discovery never ran, and without the id there is no way to ask for the
-	// screen layout.
-	if cfg.DeviceID == 0 {
-		if _, _, deviceID, err := discover(); err == nil {
-			cfg.DeviceID = deviceID
-			_ = cfg.save()
-		}
+	// The device is looked up before every run: its address comes from DHCP and
+	// does not have to be the one of the last time.
+	if err := locate(&cfg); err != nil {
+		return err
 	}
 
 	// Remember the clock face that was there before we take the screen: come
@@ -200,7 +191,7 @@ func run(once bool) error {
 	// been switched off for the night. But hanging around a switched-off device
 	// forever is pointless too — after giveUpAfter the bridge leaves, and the
 	// status line starts it again once the Times Gate is back on the network.
-	lastSeen := time.Now()
+	lastSeen, lastSearch := time.Now(), time.Now()
 	for range time.Tick(pollInterval) {
 		if !ownsLock() {
 			// Someone else took over, or the panel was turned off: leave the
@@ -212,6 +203,19 @@ func run(once bool) error {
 			fmt.Fprintln(os.Stderr, err)
 			if time.Since(lastSeen) > giveUpAfter {
 				return fmt.Errorf(i18n.T("the device has been unreachable for more than %s, leaving"), giveUpAfter)
+			}
+			// Silence usually means the device was switched off, but it also
+			// means a new address from the DHCP lease. Looking for it costs a
+			// sweep of the network, so it is not done on every tick.
+			if time.Since(lastSearch) > searchInterval {
+				lastSearch = time.Now()
+				if err := locate(&cfg); err == nil && cfg.IP != target.ip {
+					target.ip = cfg.IP
+					server.allow(cfg.IP)
+					if own, err := localIP(cfg.IP); err == nil {
+						host = own
+					}
+				}
 			}
 			continue
 		}

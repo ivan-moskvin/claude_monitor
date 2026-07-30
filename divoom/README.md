@@ -9,7 +9,7 @@ alone.
 It lives as a subcommand of the main CLI — there is no separate binary:
 
 ```bash
-claudestatus divoom on               # find the device and turn the panel on
+claudestatus divoom on [N]           # find the devices and turn the panel on device N
 claudestatus divoom off              # turn it off and give the clock face back
 claudestatus divoom                  # the bridge: updates the panel while running
 claudestatus divoom once             # send one frame and exit
@@ -19,13 +19,22 @@ claudestatus divoom preview p.gif    # look at a frame without touching the devi
 The settings are `divoom.json` in the application directory (created by `on`, mode 600):
 
 ```json
-{ "ip": "192.168.1.50", "lcd_index": 4, "port": 8477 }
+{ "on": true, "ip": "192.168.1.50", "lcd_index": 4, "port": 8477,
+  "device_id": 300373815, "mac": "98a316d87748", "name": "Times Gate" }
 ```
 
-The device is found on its own; `ip` may be left empty — the device is looked up
-through the Divoom cloud directory by shared public address. That is the only
-request going outside; with `ip` in the config the bridge works over the local
-network only.
+`on` looks for the devices every time: the address comes from DHCP and does not
+have to be the one of the last run. Two sources answer at once — a sweep of the
+local networks, which knocks on `/post` and knows a Divoom by its `error_code`,
+and the Divoom cloud directory, which lists the devices behind the same public
+address and is the only thing that knows their names. The directory is the only
+request going outside, and the search works without it.
+
+With more than one device around the human picks one, and the choice is
+remembered: `device_id` and `mac` outlive a change of address, so the next run
+finds the same device without asking again. `off` clears `on` but keeps the
+file — the chosen device and the chosen screen are settings, not the state of a
+running bridge.
 
 ## The Times Gate protocol
 
