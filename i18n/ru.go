@@ -126,6 +126,7 @@ compdef _claudestatus claudestatus
 	"Status line registered in %s\n":                                      "Строка статуса прописана в %s\n",
 	"\n%s is not in PATH — the claudestatus command will not be found.\n": "\nКаталог %s не в PATH — команда claudestatus не найдётся.\n",
 	"Line for ~/.zshrc:  export PATH=\"%s:$PATH\"\n":                      "Строка для ~/.zshrc:  export PATH=\"%s:$PATH\"\n",
+	"Command for PowerShell:  [Environment]::SetEnvironmentVariable(\"Path\", [Environment]::GetEnvironmentVariable(\"Path\", \"User\") + \";%s\", \"User\")\n": "Команда для PowerShell:  [Environment]::SetEnvironmentVariable(\"Path\", [Environment]::GetEnvironmentVariable(\"Path\", \"User\") + \";%s\", \"User\")\n",
 	"Removed %s\n":           "Удалён %s\n",
 	"Removed the cache %s\n": "Удалён кэш %s\n",
 	"The binary is still there — remove it by hand: %s\n":                 "Бинарь остался — удалите вручную: %s\n",
