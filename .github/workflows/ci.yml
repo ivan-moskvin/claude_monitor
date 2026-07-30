@@ -1,0 +1,42 @@
+# Checks every pull request into main.
+name: ci
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tests:
+    uses: ./.github/workflows/tests.yml
+
+  # The badges in the README are files in the repository: a pull request that
+  # adds tests has to bring their new count with it. Only the test badge is
+  # checked — the coverage differs between the systems, because the files behind
+  # the build tags differ, and the one in the README is whatever the author's
+  # machine measured.
+  badges:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Regenerate the badges
+        run: go run ./tools/badges
+
+      - name: The test badge is up to date
+        run: |
+          if ! git diff --quiet -- .github/badges/tests.svg; then
+            echo "The test badge does not match the tests. Run: go run ./tools/badges" >&2
+            git diff -- .github/badges/tests.svg >&2
+            exit 1
+          fi

@@ -10,7 +10,14 @@ permissions:
   contents: write
 
 jobs:
+  # A release that fails its tests is worse than no release: `claudestatus
+  # update` pulls it down by itself, onto every machine, with nobody asked.
+  # Nothing is published until this is green.
+  tests:
+    uses: ./.github/workflows/tests.yml
+
   release:
+    needs: tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
