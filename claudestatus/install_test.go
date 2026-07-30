@@ -204,6 +204,44 @@ func TestInstallWritesReadableJSON(t *testing.T) {
 	}
 }
 
+// The warning about PATH is the last thing the user reads after an install, and
+// a false one sends them editing PATH for a directory that is in it already.
+func TestWarnIfNotInPath(t *testing.T) {
+	dir := filepath.Dir(installedExe)
+	elsewhere := filepath.Join("elsewhere", "bin")
+	list := func(entries ...string) string {
+		return strings.Join(entries, string(filepath.ListSeparator))
+	}
+
+	cases := map[string]struct {
+		path string
+		warn bool
+	}{
+		"the directory alone":     {path: dir},
+		"among other entries":     {path: list(elsewhere, dir, "")},
+		"with a trailing slash":   {path: dir + string(filepath.Separator)},
+		"nowhere in PATH":         {path: elsewhere, warn: true},
+		"PATH is not set at all":  {path: "", warn: true},
+		"only a longer directory": {path: filepath.Join(dir, "deeper"), warn: true},
+	}
+
+	for name, want := range cases {
+		t.Run(name, func(t *testing.T) {
+			t.Setenv("PATH", want.path)
+
+			output := testenv.CaptureStdout(t, func() { warnIfNotInPath(installedExe) })
+			if warned := output != ""; warned != want.warn {
+				t.Errorf("PATH=%q printed %q; want a warning: %v", want.path, output, want.warn)
+			}
+			// The user is told what to do about it, not only that something is
+			// wrong.
+			if want.warn && !strings.Contains(output, dir) {
+				t.Errorf("the warning %q does not say which directory to add", output)
+			}
+		})
+	}
+}
+
 func settingsFile(t *testing.T) string {
 	t.Helper()
 

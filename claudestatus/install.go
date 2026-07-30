@@ -81,12 +81,12 @@ func install(exe string) error {
 func warnIfNotInPath(exe string) {
 	dir := filepath.Dir(exe)
 	for _, entry := range filepath.SplitList(os.Getenv("PATH")) {
-		if entry == dir {
+		if samePathEntry(entry, dir) {
 			return
 		}
 	}
 	fmt.Printf(i18n.T("\n%s is not in PATH — the claudestatus command will not be found.\n"), dir)
-	fmt.Printf(i18n.T("Line for ~/.zshrc:  export PATH=\"%s:$PATH\"\n"), dir)
+	fmt.Print(pathHint(dir))
 }
 
 // uninstall clears everything behind us: the settings entry, the check cache

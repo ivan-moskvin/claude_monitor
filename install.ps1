@@ -70,6 +70,13 @@ try {
         Write-Host $m.PathAdded
     }
 
+    # The registry says nothing to a process that is already running: without
+    # this the install below would inherit the old PATH and warn about a
+    # directory it has just been put into.
+    if (($env:Path -split ";") -notcontains $binDir) {
+        $env:Path = "$env:Path;$binDir"
+    }
+
     & (Join-Path $binDir "claudestatus.exe") install
 }
 finally {
