@@ -57,16 +57,6 @@ resets and the weekly window. The circle next to the model fills up from `low`
 (`○`) to `max` (`●`). The color of the bars follows usage: green up to 60%,
 orange up to 85%, red above.
 
-## Language
-
-English by default, Russian on a Russian system. The language is taken from
-`LC_ALL` / `LC_MESSAGES` / `LANG` (on Windows, from the user interface language)
-and can be forced:
-
-```bash
-CLAUDESTATUS_LANG=en   # or ru
-```
-
 ## Completion
 
 ```bash
