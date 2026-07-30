@@ -1,5 +1,11 @@
 # claude_monitor
 
+![Tests](./.github/badges/tests.svg)
+![Coverage](./.github/badges/coverage.svg)
+![Go](./.github/badges/go.svg)
+![Platforms](./.github/badges/platforms.svg)
+![Dependencies](./.github/badges/dependencies.svg)
+
 Claude limits in the Claude Code status line — visible while you work, without `/usage`.
 
 ![The status line in Claude Code](statusline.webp)
@@ -79,13 +85,18 @@ claudestatus divoom on
 ```
 
 Finds the device on the network and turns the panel on. From there it updates
-itself while a session is running. Turn it off with `claudestatus divoom off`.
+itself while a session is running. It takes the fifth screen, which can be
+changed to any other: `claudestatus divoom screen 3`.
 
-It takes the fifth screen, which can be changed to any other:
-
-```bash
-claudestatus divoom screen 3
 ```
+claudestatus divoom on [N]       find the devices and turn the panel on device N
+claudestatus divoom off          turn the panel off and give the screen its clock face back
+claudestatus divoom              keep the panel updated (works while running)
+claudestatus divoom once         send the panel once and exit
+claudestatus divoom screen [N]   show or take over screen 1–5
+claudestatus divoom preview FILE save a frame to a file without touching the device
+```
+
 The device draws the panel by downloading a frame, so on every update the screen
 blinks its loading indicator. The details of the protocol are in
 [divoom/README.md](divoom/README.md).

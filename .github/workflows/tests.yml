@@ -1,0 +1,40 @@
+# The checks themselves, called from ci.yml (every pull request) and from
+# release.yml (every tag). One definition: a release must pass exactly what a
+# pull request passes, or the gate is only as good as whoever remembers to keep
+# the two lists the same.
+name: tests
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    # The status line and the update are shared between the systems, while the
+    # per-user directories they write to are not: the tests run everywhere the
+    # release is built for.
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Test
+        run: go test ./...
+
+      # The build the users actually get: no test binary is involved in it. It
+      # goes into a directory of its own — next to the package the name would
+      # collide with the claudestatus directory itself.
+      - name: Build
+        run: go build -o dist/ ./claudestatus
