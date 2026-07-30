@@ -17,8 +17,9 @@ import (
 )
 
 // The cloud directory: it answers with the devices sitting behind the same
-// public address. No authorization required.
-const lanDirectory = "https://app.divoom-gz.com/Device/ReturnSameLANDevice"
+// public address. No authorization required. A variable, so that reading its
+// answer can be checked against a local server instead of the cloud.
+var lanDirectory = "https://app.divoom-gz.com/Device/ReturnSameLANDevice"
 
 const (
 	// The whole network is knocked on at once: a device answers in

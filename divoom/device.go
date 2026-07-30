@@ -61,8 +61,13 @@ func (d device) showGif(url string) error {
 	})
 }
 
+// The cloud endpoint that knows the screen layout of a device. A variable for
+// the same reason as lanDirectory: its answer has to be read correctly, and
+// that is checkable without the cloud.
+var lcdInfoAPI = "https://app.divoom-gz.com/Channel/Get5LcdInfoV2"
+
 func layout(deviceID int) (clockIDs []int, independence int, err error) {
-	url := fmt.Sprintf("https://app.divoom-gz.com/Channel/Get5LcdInfoV2?DeviceType=LCD&DeviceId=%d", deviceID)
+	url := fmt.Sprintf("%s?DeviceType=LCD&DeviceId=%d", lcdInfoAPI, deviceID)
 	client := http.Client{Timeout: 15 * time.Second}
 	response, err := client.Get(url)
 	if err != nil {

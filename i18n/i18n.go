@@ -9,6 +9,7 @@ package i18n
 
 import (
 	"os"
+	"sort"
 	"strings"
 )
 
@@ -36,10 +37,29 @@ func Current() Lang { return current }
 // T translates the English source text, returning it unchanged when the catalog
 // has nothing for it.
 func T(text string) string {
-	if translated, ok := catalogs[current][text]; ok {
+	return In(current, text)
+}
+
+// In translates into a language named explicitly, whatever the language of the
+// process is. The utility itself always speaks the one language it detected;
+// this is for looking a catalog over as a whole — the panel has to be able to
+// draw its labels in every language, not just in the current one.
+func In(lang Lang, text string) string {
+	if translated, ok := catalogs[lang][text]; ok {
 		return translated
 	}
 	return text
+}
+
+// Langs lists the languages the utility speaks, English first — it is the
+// source language and has no catalog of its own.
+func Langs() []Lang {
+	langs := []Lang{EN}
+	for lang := range catalogs {
+		langs = append(langs, lang)
+	}
+	sort.Slice(langs[1:], func(i, j int) bool { return langs[i+1] < langs[j+1] })
+	return langs
 }
 
 // detect resolves the language: an explicit override wins over the system, so a
