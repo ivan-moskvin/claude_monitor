@@ -27,7 +27,6 @@ Usage:
   claudestatus update     download the latest version and replace itself
   claudestatus uninstall  remove the status line, the cache and the binary
   claudestatus divoom     limits panel on a Divoom Times Gate (divoom help)
-  claudestatus completion shell: completion script (zsh|bash)
   claudestatus version    print the version
   claudestatus help       this help
 
@@ -55,8 +54,6 @@ func main() {
 		exit(uninstall())
 	case "divoom":
 		exit(divoom.Run(args[1:]))
-	case "completion":
-		exit(completion(args[1:]))
 	case "version", "--version", "-v":
 		fmt.Println(version())
 	case "help", "--help", "-h":

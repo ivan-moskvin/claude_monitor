@@ -57,12 +57,6 @@ resets and the weekly window. The circle next to the model fills up from `low`
 (`○`) to `max` (`●`). The color of the bars follows usage: green up to 60%,
 orange up to 85%, red above.
 
-## Completion
-
-```bash
-claudestatus completion zsh >> ~/.zshrc    # or bash >> ~/.bashrc
-```
-
 ## Divoom Times Gate
 
 The same limits — on the screen of a [Divoom Times Gate](https://divoom.com/products/time-gate).

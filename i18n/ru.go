@@ -17,7 +17,6 @@ Usage:
   claudestatus update     download the latest version and replace itself
   claudestatus uninstall  remove the status line, the cache and the binary
   claudestatus divoom     limits panel on a Divoom Times Gate (divoom help)
-  claudestatus completion shell: completion script (zsh|bash)
   claudestatus version    print the version
   claudestatus help       this help
 
@@ -33,7 +32,6 @@ Environment:
   claudestatus update     скачать последнюю версию и заменить себя ею
   claudestatus uninstall  убрать строку статуса, кэш и сам бинарь
   claudestatus divoom     панель лимитов на Divoom Times Gate (divoom help)
-  claudestatus completion оболочка: скрипт автодополнения (zsh|bash)
   claudestatus version    показать версию
   claudestatus help       эта справка
 
@@ -47,74 +45,6 @@ Environment:
 	// claudestatus: status line
 	"reset":     "сброс",
 	"%dh %02dm": "%dч %02dм",
-
-	// claudestatus: completion
-	`Usage:
-  claudestatus completion zsh   >> ~/.zshrc
-  claudestatus completion bash  >> ~/.bashrc
-`: `Использование:
-  claudestatus completion zsh   >> ~/.zshrc
-  claudestatus completion bash  >> ~/.bashrc
-`,
-	`_claudestatus() {
-  local -a commands
-  commands=(
-    'install:register in the Claude Code settings'
-    'check:check whether a new version is out'
-    'update:update to the latest version'
-    'uninstall:remove the status line and the binary'
-    'divoom:limits panel on a Divoom Times Gate'
-    'completion:shell completion script'
-    'version:print the version'
-    'help:help'
-  )
-  local -a divoom_commands
-  divoom_commands=(
-    'on:find the device and turn the panel on'
-    'off:turn the panel off'
-    'once:send the panel once'
-    'screen:show or take over screen 1-5'
-    'preview:save a frame to a file'
-    'help:help'
-  )
-
-  if (( CURRENT == 2 )); then
-    _describe 'command' commands
-  elif (( CURRENT == 3 )) && [[ ${words[2]} == divoom ]]; then
-    _describe 'command' divoom_commands
-  fi
-}
-compdef _claudestatus claudestatus
-`: `_claudestatus() {
-  local -a commands
-  commands=(
-    'install:прописать себя в настройки Claude Code'
-    'check:проверить, вышла ли новая версия'
-    'update:обновиться до последней версии'
-    'uninstall:убрать строку статуса и сам бинарь'
-    'divoom:панель лимитов на Divoom Times Gate'
-    'completion:скрипт автодополнения для оболочки'
-    'version:показать версию'
-    'help:справка'
-  )
-  local -a divoom_commands
-  divoom_commands=(
-    'on:найти устройство и включить панель'
-    'off:выключить панель'
-    'once:отправить панель один раз'
-    'screen:показать или занять экран 1-5'
-    'preview:сохранить кадр в файл'
-    'help:справка'
-  )
-
-  if (( CURRENT == 2 )); then
-    _describe 'команда' commands
-  elif (( CURRENT == 3 )) && [[ ${words[2]} == divoom ]]; then
-    _describe 'команда' divoom_commands
-  fi
-}
-compdef _claudestatus claudestatus
-`,
 
 	// claudestatus: install and uninstall
 	"%s does not parse — fix it by hand":                                  "%s не разбирается — поправьте его вручную",
