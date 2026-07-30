@@ -104,7 +104,9 @@ func run(once bool) error {
 	if cfg.PrevClockID == 0 && cfg.DeviceID != 0 {
 		if clocks, independence, err := layout(cfg.DeviceID); err == nil && cfg.LcdIndex < len(clocks) {
 			cfg.PrevClockID, cfg.PrevIndependence = clocks[cfg.LcdIndex], independence
-			_ = cfg.save()
+			_ = update(func(saved *config) {
+				saved.PrevClockID, saved.PrevIndependence = cfg.PrevClockID, cfg.PrevIndependence
+			})
 		}
 	}
 

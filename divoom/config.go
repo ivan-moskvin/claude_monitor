@@ -74,6 +74,20 @@ func loadConfig() (config, error) {
 	return cfg, nil
 }
 
+// update re-reads the file and lets change touch only the fields it means to.
+// The bridge lives for hours with a copy of the config in memory, while the
+// human keeps giving orders — `screen`, `off` — through another process. Saving
+// the whole copy would put a stale answer back over a fresh one; the last word
+// belongs to whoever spoke last.
+func update(change func(*config)) error {
+	cfg, err := loadConfig()
+	if err != nil {
+		return err
+	}
+	change(&cfg)
+	return cfg.save()
+}
+
 func (c config) enabled() bool {
 	return c.On == nil || *c.On
 }

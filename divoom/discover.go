@@ -157,7 +157,12 @@ func locate(cfg *config) error {
 	if picked.name != "" {
 		cfg.Name = picked.name
 	}
-	return cfg.save()
+
+	// Only the address is ours to write: the screen and the on/off flag may have
+	// been changed by the human while we were looking.
+	return update(func(saved *config) {
+		saved.IP, saved.DeviceID, saved.MAC, saved.Name = cfg.IP, cfg.DeviceID, cfg.MAC, cfg.Name
+	})
 }
 
 func askDirectory() ([]found, error) {
