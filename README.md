@@ -1,7 +1,6 @@
 # claude_monitor
 
 ![Tests](./.github/badges/tests.svg)
-![Coverage](./.github/badges/coverage.svg)
 ![Go](./.github/badges/go.svg)
 ![Platforms](./.github/badges/platforms.svg)
 ![Dependencies](./.github/badges/dependencies.svg)
