@@ -27,15 +27,11 @@ const badgesDir = ".github/badges"
 // The colors are the ones shields.io uses, so that the badges do not look like
 // strangers next to the ones people are used to. Go keeps its own brand blue.
 const (
-	colorGreen  = "#4c1"
-	colorBlue   = "#007ec6"
-	colorGo     = "#00ADD8"
-	colorRed    = "#e05d44"
-	colorLabel  = "#555"
-	colorYellow = "#dfb317"
-	colorOrange = "#fe7d37"
-	colorLime   = "#97ca00"
-	colorOlive  = "#a4a61d"
+	colorGreen = "#4c1"
+	colorBlue  = "#007ec6"
+	colorGo    = "#00ADD8"
+	colorRed   = "#e05d44"
+	colorLabel = "#555"
 )
 
 func main() {
@@ -60,10 +56,10 @@ func run() error {
 		return err
 	}
 
-	badges := map[string]string{
-		"tests.svg":    testsBadge(result),
-		"coverage.svg": flatBadge("coverage", fmt.Sprintf("%.1f%%", result.coverage), coverageColor(result.coverage)),
-	}
+	// The coverage is measured but not drawn: a third of the code sweeps the
+	// network or talks to a device and is deliberately left untested, so the
+	// number describes what the utility does rather than how well it is checked.
+	badges := map[string]string{"tests.svg": testsBadge(result)}
 
 	version, err := goVersion(root)
 	if err != nil {
@@ -216,23 +212,6 @@ func testsBadge(result testResult) string {
 		return flatBadge("tests", fmt.Sprintf("%d failed, %d passed", result.failed, result.passed), colorRed)
 	}
 	return flatBadge("tests", fmt.Sprintf("%d passed", result.passed), colorGreen)
-}
-
-func coverageColor(percentage float64) string {
-	switch {
-	case percentage >= 90:
-		return colorGreen
-	case percentage >= 80:
-		return colorLime
-	case percentage >= 70:
-		return colorOlive
-	case percentage >= 60:
-		return colorYellow
-	case percentage >= 50:
-		return colorOrange
-	default:
-		return colorRed
-	}
 }
 
 var goDirective = regexp.MustCompile(`(?m)^go\s+([0-9]+\.[0-9]+)`)
