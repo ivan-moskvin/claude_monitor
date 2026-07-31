@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"net/netip"
 	"strconv"
 	"strings"
 	"sync"
@@ -99,7 +100,8 @@ func (a *assets) serve(w http.ResponseWriter, r *http.Request) {
 	allowIP := a.allowIP
 	a.mu.Unlock()
 
-	if host, _, err := net.SplitHostPort(r.RemoteAddr); err != nil || (allowIP != "" && host != allowIP) {
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil || !sameHost(allowIP, host) {
 		http.NotFound(w, r)
 		return
 	}
@@ -122,6 +124,26 @@ func (a *assets) serve(w http.ResponseWriter, r *http.Request) {
 	case a.fetched <- r.URL.Path:
 	default:
 	}
+}
+
+// sameHost compares two addresses as addresses rather than as text: one IPv6
+// host reaches us written in more than one way — shortened differently, mapped
+// from v4, or carrying a %zone the device never told us about — and a string
+// comparison would answer the device itself with a 404.
+func sameHost(allowIP, host string) bool {
+	if allowIP == "" {
+		return true
+	}
+	want, wantErr := netip.ParseAddr(allowIP)
+	got, gotErr := netip.ParseAddr(host)
+	if wantErr != nil || gotErr != nil {
+		return allowIP == host
+	}
+	want, got = want.Unmap(), got.Unmap()
+	if want.Zone() == "" {
+		got = got.WithZone("")
+	}
+	return want == got
 }
 
 func (a *assets) publish(hostIP, hash string, data []byte) string {

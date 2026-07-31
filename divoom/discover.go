@@ -241,7 +241,7 @@ func scanLAN() []found {
 // /post at all.
 func speaks(ip string) bool {
 	client := http.Client{Timeout: scanTimeout}
-	response, err := client.Post("http://"+ip+"/post", "application/json",
+	response, err := client.Post(postURL(ip), "application/json",
 		bytes.NewReader([]byte(`{"Command":"Channel/GetAllConf"}`)))
 	if err != nil {
 		return false

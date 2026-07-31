@@ -106,6 +106,34 @@ func TestServeAnswersTheDeviceOnly(t *testing.T) {
 	}
 }
 
+// One IPv6 host reaches the server written in more than one way, and the device
+// is not to be told it is a stranger over a matter of spelling.
+func TestServeAnswersTheSameIPv6HostHoweverItIsWritten(t *testing.T) {
+	server := newAssets(8477, "fd00::2")
+	link := server.publish("fd00::2", "abc123", []byte("a frame"))
+
+	for _, address := range []string{"fd00::2", "fd00:0:0:0:0:0:0:2", "fd00::2%en0"} {
+		if status, _ := fetch(t, server, link, address); status != http.StatusOK {
+			t.Errorf("the device at %s got %d; want the frame", address, status)
+		}
+	}
+
+	if status, _ := fetch(t, server, link, "fd00::77"); status != http.StatusNotFound {
+		t.Errorf("a neighbour got %d; want a closed door", status)
+	}
+}
+
+// A v4 address mapped into v6 is the same host: that is how it arrives when the
+// listener is dual-stack.
+func TestServeAnswersAMappedAddress(t *testing.T) {
+	server := newAssets(8477, "192.168.0.5")
+	link := server.publish("192.168.0.2", "abc123", []byte("a frame"))
+
+	if status, _ := fetch(t, server, link, "::ffff:192.168.0.5"); status != http.StatusOK {
+		t.Errorf("the device behind a mapped address got %d; want the frame", status)
+	}
+}
+
 func TestServeUnknownFrame(t *testing.T) {
 	server := newAssets(8477, "")
 
