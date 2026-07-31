@@ -3,10 +3,63 @@ package divoom
 import (
 	"net/http"
 	"net/http/httptest"
+	"net/netip"
 	"testing"
 
 	"github.com/ivan-moskvin/claude_monitor/i18n"
 )
+
+// The mask the interface reports is the one that gets swept: a /22 router hands
+// out addresses the old three-octet guess would never have knocked on. Only a
+// network too wide to walk is cut down to the /24 around us.
+func TestScanRange(t *testing.T) {
+	cases := []struct {
+		own  string
+		bits int
+		want string
+	}{
+		{"192.168.1.7", 24, "192.168.1.0/24"},
+		{"10.0.5.7", 22, "10.0.4.0/22"},
+		{"172.20.3.9", 30, "172.20.3.8/30"},
+		// Wider than a /22: millions of addresses nobody would wait for.
+		{"10.0.5.7", 16, "10.0.5.0/24"},
+		{"10.0.5.7", 8, "10.0.5.0/24"},
+		// A mask that makes no sense is treated as the narrow case.
+		{"192.168.1.7", 40, "192.168.1.0/24"},
+	}
+
+	for _, c := range cases {
+		own := netip.MustParseAddr(c.own)
+		if got := scanRange(own, c.bits); got.String() != c.want {
+			t.Errorf("scanRange(%s, %d) = %s; want %s", c.own, c.bits, got, c.want)
+		}
+	}
+}
+
+// Neither the network address nor the broadcast one belongs to a device.
+func TestHostsOf(t *testing.T) {
+	cases := []struct {
+		network string
+		want    int
+		first   string
+		last    string
+	}{
+		{network: "192.168.1.0/24", want: 254, first: "192.168.1.1", last: "192.168.1.254"},
+		{network: "10.0.4.0/22", want: 1022, first: "10.0.4.1", last: "10.0.7.254"},
+		{network: "172.20.3.8/30", want: 2, first: "172.20.3.9", last: "172.20.3.10"},
+	}
+
+	for _, c := range cases {
+		hosts := hostsOf(netip.MustParsePrefix(c.network))
+		if len(hosts) != c.want {
+			t.Errorf("hostsOf(%s) swept %d addresses; want %d", c.network, len(hosts), c.want)
+			continue
+		}
+		if hosts[0] != c.first || hosts[len(hosts)-1] != c.last {
+			t.Errorf("hostsOf(%s) ran %s…%s; want %s…%s", c.network, hosts[0], hosts[len(hosts)-1], c.first, c.last)
+		}
+	}
+}
 
 // The id and the MAC outlive a change of address, so they decide first; a
 // config from an older version has neither and only knows the address.

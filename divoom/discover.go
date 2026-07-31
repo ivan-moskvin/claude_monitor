@@ -8,8 +8,8 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"net/netip"
 	"sort"
-	"strconv"
 	"sync"
 	"time"
 
@@ -27,6 +27,13 @@ const (
 	// a couple of seconds.
 	scanWorkers = 128
 	scanTimeout = 1200 * time.Millisecond
+
+	// How many addresses of one network are knocked on. A /22 is the widest
+	// that still fits the couple of seconds above; a /16 — let alone the /8 a
+	// 10.x.x.x network can be — is millions of addresses and no search at all,
+	// so a wider network is narrowed to the /24 around our own address.
+	maxScanHosts   = 1024
+	narrowedPrefix = 24
 )
 
 // found — a Divoom device reachable right now. The address is what we talk to;
@@ -204,10 +211,8 @@ func askDirectory() ([]found, error) {
 // device changing its address.
 func scanLAN() []found {
 	var addresses []string
-	for _, prefix := range localPrefixes() {
-		for host := 1; host < 255; host++ {
-			addresses = append(addresses, prefix+strconv.Itoa(host))
-		}
+	for _, network := range localNetworks() {
+		addresses = append(addresses, hostsOf(network)...)
 	}
 
 	var (
@@ -255,17 +260,18 @@ func speaks(ip string) bool {
 	return err == nil && bytes.Contains(body, []byte("error_code"))
 }
 
-// localPrefixes — the "192.168.1." part of every private IPv4 network we are
-// in. Only the last octet is swept: a mask wider than /24 means thousands of
-// addresses, and a device on a home network never sits further away.
-func localPrefixes() []string {
+// localNetworks — every private IPv4 network this machine sits in, taken from
+// the interface with its own mask: a /16 or a /22 is as common on a router as a
+// /24, and cutting the address down to three octets would leave the device
+// unreachable for no reason other than where the mask happens to fall.
+func localNetworks() []netip.Prefix {
 	interfaces, err := net.Interfaces()
 	if err != nil {
 		return nil
 	}
 
-	var prefixes []string
-	seen := make(map[string]bool)
+	var networks []netip.Prefix
+	seen := make(map[netip.Prefix]bool)
 
 	for _, iface := range interfaces {
 		if iface.Flags&net.FlagUp == 0 || iface.Flags&net.FlagLoopback != 0 {
@@ -284,12 +290,42 @@ func localPrefixes() []string {
 			if ip4 == nil || !ip4.IsPrivate() {
 				continue
 			}
-			prefix := fmt.Sprintf("%d.%d.%d.", ip4[0], ip4[1], ip4[2])
-			if !seen[prefix] {
-				seen[prefix] = true
-				prefixes = append(prefixes, prefix)
+			own, ok := netip.AddrFromSlice(ip4)
+			if !ok {
+				continue
+			}
+			bits, _ := network.Mask.Size()
+			scanned := scanRange(own.Unmap(), bits)
+			if !seen[scanned] {
+				seen[scanned] = true
+				networks = append(networks, scanned)
 			}
 		}
 	}
-	return prefixes
+	return networks
+}
+
+// scanRange — the part of the network around own that is small enough to knock
+// on address by address.
+func scanRange(own netip.Addr, bits int) netip.Prefix {
+	if bits < 0 || bits > own.BitLen() {
+		bits = narrowedPrefix
+	}
+	if hosts := 1 << (own.BitLen() - bits); hosts > maxScanHosts {
+		bits = narrowedPrefix
+	}
+	return netip.PrefixFrom(own, bits).Masked()
+}
+
+// hostsOf — the addresses of a network that can belong to a device: neither the
+// network address itself nor the broadcast one at the end.
+func hostsOf(network netip.Prefix) []string {
+	var hosts []string
+	for addr := network.Addr().Next(); network.Contains(addr); addr = addr.Next() {
+		hosts = append(hosts, addr.String())
+	}
+	if len(hosts) > 0 {
+		hosts = hosts[:len(hosts)-1]
+	}
+	return hosts
 }
