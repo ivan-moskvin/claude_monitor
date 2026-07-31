@@ -111,8 +111,8 @@ func TestDrawTextSplitPaintsEitherSideOfTheSplit(t *testing.T) {
 	p.drawTextSplit("88", 0, 0, 1, glyphWidth, idxWhite, idxGrey)
 
 	var left, right bool
-	for y := 0; y < glyphHeight; y++ {
-		for x := 0; x < 2*glyphWidth+1; x++ {
+	for y := range glyphHeight {
+		for x := range 2*glyphWidth + 1 {
 			switch p.img.ColorIndexAt(x, y) {
 			case idxWhite:
 				left = true
@@ -137,8 +137,8 @@ func TestDrawTextCenteredIsSymmetric(t *testing.T) {
 	p.drawTextCentered("88", 0, 2, idxWhite)
 
 	minX, maxX := panelSize, -1
-	for y := 0; y < panelSize; y++ {
-		for x := 0; x < panelSize; x++ {
+	for y := range panelSize {
+		for x := range panelSize {
 			if p.img.ColorIndexAt(x, y) == idxWhite {
 				minX, maxX = min(minX, x), max(maxX, x)
 			}

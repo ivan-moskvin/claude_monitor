@@ -163,7 +163,7 @@ func assetName() string {
 // checksumFor looks for a line of the form "<sha256>  <file>" — the sha256sum
 // format.
 func checksumFor(sums, asset string) (string, bool) {
-	for _, line := range strings.Split(sums, "\n") {
+	for line := range strings.SplitSeq(sums, "\n") {
 		fields := strings.Fields(line)
 		if len(fields) == 2 && strings.TrimPrefix(fields[1], "*") == asset {
 			return fields[0], true

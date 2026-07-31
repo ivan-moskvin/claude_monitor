@@ -135,7 +135,7 @@ func runTests(root string) (testResult, error) {
 	}
 
 	var result testResult
-	for _, line := range strings.Split(string(output), "\n") {
+	for line := range strings.SplitSeq(string(output), "\n") {
 		if line == "" {
 			continue
 		}
@@ -178,7 +178,7 @@ func shippedPackages(root string) ([]string, error) {
 	}
 
 	var packages []string
-	for _, name := range strings.Fields(string(output)) {
+	for name := range strings.FieldsSeq(string(output)) {
 		if strings.Contains(name, "/tools/") || strings.HasSuffix(name, "/internal/testenv") {
 			continue
 		}
@@ -244,7 +244,7 @@ func directDependencies(root string) (int, error) {
 			count++
 			continue
 		}
-		for _, line := range strings.Split(match[1], "\n") {
+		for line := range strings.SplitSeq(match[1], "\n") {
 			if strings.TrimSpace(line) != "" {
 				count++
 			}
@@ -271,7 +271,7 @@ func platforms(root string) ([]string, error) {
 	names := map[string]string{"darwin": "macOS", "linux": "Linux", "windows": "Windows"}
 	var found []string
 	seen := map[string]bool{}
-	for _, target := range strings.Fields(string(match[1])) {
+	for target := range strings.FieldsSeq(string(match[1])) {
 		goos, _, ok := strings.Cut(target, "/")
 		if !ok {
 			continue

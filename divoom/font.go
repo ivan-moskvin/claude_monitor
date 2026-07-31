@@ -76,8 +76,8 @@ func (p *panel) drawTextSplit(text string, x, y, scale, splitX int, left, right 
 		if !ok {
 			glyph = glyphs['?']
 		}
-		for row := 0; row < glyphHeight; row++ {
-			for col := 0; col < glyphWidth; col++ {
+		for row := range glyphHeight {
+			for col := range glyphWidth {
 				if glyph[row][col] != '1' {
 					continue
 				}
