@@ -9,6 +9,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"slices"
 
 	"github.com/ivan-moskvin/claude_monitor/divoom"
 	"github.com/ivan-moskvin/claude_monitor/i18n"
@@ -72,10 +73,5 @@ func exit(err error) {
 }
 
 func hasFlag(args []string, name string) bool {
-	for _, arg := range args {
-		if arg == name {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(args, name)
 }

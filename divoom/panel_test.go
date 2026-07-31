@@ -3,6 +3,7 @@ package divoom
 import (
 	"bytes"
 	"image/gif"
+	"maps"
 	"testing"
 	"time"
 )
@@ -141,9 +142,7 @@ func sampleSnapshot() snapshot {
 
 func withWindow(state snapshot, id string, w usageWindow) snapshot {
 	windows := make(map[string]usageWindow, len(state.windows))
-	for key, value := range state.windows {
-		windows[key] = value
-	}
+	maps.Copy(windows, state.windows)
 	windows[id] = w
 	return snapshot{windows: windows, stale: state.stale, age: state.age, err: state.err}
 }

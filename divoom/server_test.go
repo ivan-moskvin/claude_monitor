@@ -32,7 +32,7 @@ func TestPublishKeepsTheLastFrames(t *testing.T) {
 	server := newAssets(8477, "")
 
 	var links []string
-	for i := 0; i < keepFrames+2; i++ {
+	for i := range keepFrames + 2 {
 		links = append(links, server.publish("192.168.0.2", "hash"+strconv.Itoa(i), []byte("frame")))
 	}
 

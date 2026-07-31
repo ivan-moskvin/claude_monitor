@@ -57,8 +57,8 @@ func newPanel() *panel {
 }
 
 func (p *panel) fillRect(x, y, w, h int, idx uint8) {
-	for dy := 0; dy < h; dy++ {
-		for dx := 0; dx < w; dx++ {
+	for dy := range h {
+		for dx := range w {
 			px, py := x+dx, y+dy
 			if px < 0 || py < 0 || px >= panelSize || py >= panelSize {
 				continue
@@ -120,8 +120,8 @@ func (p *panel) drawResetIcon(x, y, size int, idx uint8) {
 	radius := float64(size) / 2
 	center := radius - 0.5
 
-	for dy := 0; dy < size; dy++ {
-		for dx := 0; dx < size; dx++ {
+	for dy := range size {
+		for dx := range size {
 			ox, oy := float64(dx)-center, float64(dy)-center
 			distance := math.Hypot(ox, oy)
 			if distance > radius || distance < radius-2.5 {
@@ -140,7 +140,7 @@ func (p *panel) drawResetIcon(x, y, size int, idx uint8) {
 
 	// The arrow head at the break: three rows narrowing to the right.
 	tipX, tipY := x+size/2, y
-	for row := 0; row < 3; row++ {
+	for row := range 3 {
 		p.fillRect(tipX+row, tipY+row, 3-row, 1, idx)
 		p.fillRect(tipX+row, tipY-row, 3-row, 1, idx)
 	}
