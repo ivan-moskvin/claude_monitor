@@ -25,6 +25,15 @@ func TestPublishBuildsALinkForTheDevice(t *testing.T) {
 	}
 }
 
+func TestPublishBracketsAnIPv6Host(t *testing.T) {
+	server := newAssets(8477, "")
+	url := server.publish("fd00::2", "abc123", []byte("a frame"))
+
+	if url != "http://[fd00::2]:8477/panel-abc123.gif" {
+		t.Errorf("publish() = %q", url)
+	}
+}
+
 // Only the last few frames are kept: the device comes for the file with a delay
 // and may re-read it after a reboot, so the link must not go stale at once —
 // but the frames must not pile up either.
