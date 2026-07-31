@@ -11,6 +11,8 @@ Claude limits in the Claude Code status line — visible while you work, without
 
 ## Install
 
+**Requires macOS 12 or newer, Windows 10 or newer, or Linux with kernel 3.2 or newer.**
+
 macOS and Linux:
 
 ```bash
