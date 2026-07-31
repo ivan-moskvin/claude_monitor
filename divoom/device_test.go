@@ -37,6 +37,24 @@ func TestDeviceCall(t *testing.T) {
 	}
 }
 
+// The address of the device goes into a URL, where an IPv6 literal has to be
+// bracketed — but it may already carry a port, and then it is left alone.
+func TestPostURL(t *testing.T) {
+	cases := map[string]string{
+		"192.168.0.2":        "http://192.168.0.2/post",
+		"127.0.0.1:52345":    "http://127.0.0.1:52345/post",
+		"fd00::2":            "http://[fd00::2]/post",
+		"[fd00::2]:52345":    "http://[fd00::2]:52345/post",
+		"::ffff:192.168.0.2": "http://[::ffff:192.168.0.2]/post",
+	}
+
+	for address, want := range cases {
+		if got := postURL(address); got != want {
+			t.Errorf("postURL(%q) = %q; want %q", address, got, want)
+		}
+	}
+}
+
 func TestDeviceCallUnreachable(t *testing.T) {
 	// Nothing listens on this address: the device is switched off.
 	target := device{ip: "127.0.0.1:1", lcd: 4}

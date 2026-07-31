@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"net/netip"
 	"time"
 
 	"github.com/ivan-moskvin/claude_monitor/i18n"
@@ -27,7 +28,7 @@ func (d device) call(payload map[string]any) error {
 	}
 
 	client := http.Client{Timeout: 8 * time.Second}
-	response, err := client.Post("http://"+d.ip+"/post", "application/json", bytes.NewReader(body))
+	response, err := client.Post(postURL(d.ip), "application/json", bytes.NewReader(body))
 	if err != nil {
 		return fmt.Errorf(i18n.T("the device is unreachable: %w"), err)
 	}
@@ -109,6 +110,16 @@ func (d device) restoreScreen(clockID, independence int) error {
 		"LcdIndex":        d.lcd,
 		"ClockId":         clockID,
 	})
+}
+
+// postURL — where the commands go. The address may already carry a port, which
+// is how it arrives from a test server, so only a bare IPv6 literal is
+// bracketed: a URL takes one no other way.
+func postURL(address string) string {
+	if addr, err := netip.ParseAddr(address); err == nil && addr.Is6() {
+		address = "[" + address + "]"
+	}
+	return "http://" + address + "/post"
 }
 
 // localIP — the address the device will see us at. The UDP connection sends
