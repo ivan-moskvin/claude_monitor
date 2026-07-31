@@ -17,14 +17,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ivan-moskvin/claude_monitor/i18n"
+	"github.com/ivan-moskvin/claudestatus/i18n"
 )
 
 // We update the same way we were installed: download the ready binary from a
 // release and replace ourselves with it. Neither Go nor a clone of the
 // repository is needed on the machine.
 const (
-	repository = "ivan-moskvin/claude_monitor"
+	repository = "ivan-moskvin/claudestatus"
 	// The first call checks right away — there is no cache yet — and after that
 	// no more than once an hour.
 	updateCheckInterval = time.Hour

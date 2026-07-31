@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ivan-moskvin/claude_monitor/i18n"
-	"github.com/ivan-moskvin/claude_monitor/paths"
+	"github.com/ivan-moskvin/claudestatus/i18n"
+	"github.com/ivan-moskvin/claudestatus/paths"
 )
 
 // The device only refreshes the panel while the bridge is running. Nobody is

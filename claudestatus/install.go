@@ -7,9 +7,9 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/ivan-moskvin/claude_monitor/divoom"
-	"github.com/ivan-moskvin/claude_monitor/i18n"
-	"github.com/ivan-moskvin/claude_monitor/paths"
+	"github.com/ivan-moskvin/claudestatus/divoom"
+	"github.com/ivan-moskvin/claudestatus/i18n"
+	"github.com/ivan-moskvin/claudestatus/paths"
 )
 
 // installSelf registers the binary that is running right now.

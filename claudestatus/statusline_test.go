@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ivan-moskvin/claude_monitor/internal/testenv"
-	"github.com/ivan-moskvin/claude_monitor/paths"
+	"github.com/ivan-moskvin/claudestatus/internal/testenv"
+	"github.com/ivan-moskvin/claudestatus/paths"
 )
 
 // The line is never allowed to disappear: whatever arrives on stdin, Claude

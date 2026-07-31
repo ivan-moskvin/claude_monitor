@@ -10,7 +10,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ivan-moskvin/claude_monitor/i18n"
+	"github.com/ivan-moskvin/claudestatus/i18n"
 )
 
 // How many past frames are kept available. The device comes for the file with a

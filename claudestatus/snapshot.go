@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/ivan-moskvin/claude_monitor/paths"
+	"github.com/ivan-moskvin/claudestatus/paths"
 )
 
 // The usage snapshot is the only contract with whoever shows the numbers

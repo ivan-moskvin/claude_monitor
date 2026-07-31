@@ -6,7 +6,7 @@ import (
 	"net/netip"
 	"testing"
 
-	"github.com/ivan-moskvin/claude_monitor/i18n"
+	"github.com/ivan-moskvin/claudestatus/i18n"
 )
 
 // The mask the interface reports is the one that gets swept: a /22 router hands

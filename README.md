@@ -1,4 +1,4 @@
-# claude_monitor
+# claudestatus
 
 ![Tests](./.github/badges/tests.svg)
 ![Go](./.github/badges/go.svg)
@@ -16,13 +16,13 @@ Claude limits in the Claude Code status line — visible while you work, without
 macOS and Linux:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/ivan-moskvin/claude_monitor/main/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/ivan-moskvin/claudestatus/main/install.sh | sh
 ```
 
 Windows (PowerShell):
 
 ```powershell
-irm https://raw.githubusercontent.com/ivan-moskvin/claude_monitor/main/install.ps1 | iex
+irm https://raw.githubusercontent.com/ivan-moskvin/claudestatus/main/install.ps1 | iex
 ```
 
 ## Update

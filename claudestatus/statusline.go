@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ivan-moskvin/claude_monitor/divoom"
-	"github.com/ivan-moskvin/claude_monitor/i18n"
+	"github.com/ivan-moskvin/claudestatus/divoom"
+	"github.com/ivan-moskvin/claudestatus/i18n"
 )
 
 const (

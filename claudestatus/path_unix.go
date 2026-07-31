@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"github.com/ivan-moskvin/claude_monitor/i18n"
+	"github.com/ivan-moskvin/claudestatus/i18n"
 )
 
 // samePathEntry compares an entry of PATH against a directory.

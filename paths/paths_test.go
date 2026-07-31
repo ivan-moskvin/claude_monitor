@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/ivan-moskvin/claude_monitor/internal/testenv"
+	"github.com/ivan-moskvin/claudestatus/internal/testenv"
 )
 
 func TestDirIsCreated(t *testing.T) {

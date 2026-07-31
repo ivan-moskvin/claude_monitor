@@ -1,3 +1,3 @@
-module github.com/ivan-moskvin/claude_monitor
+module github.com/ivan-moskvin/claudestatus
 
 go 1.26

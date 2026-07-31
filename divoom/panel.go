@@ -11,7 +11,7 @@ import (
 	"math"
 	"time"
 
-	"github.com/ivan-moskvin/claude_monitor/i18n"
+	"github.com/ivan-moskvin/claudestatus/i18n"
 )
 
 // The device accepts a GIF sized 16, 32, 64 or 128 pixels.

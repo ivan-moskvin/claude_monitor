@@ -2,10 +2,10 @@
 # Installs claudestatus from the latest release. After that the utility looks
 # after itself: claudestatus update to update, claudestatus uninstall to remove.
 #
-#   curl -fsSL https://raw.githubusercontent.com/ivan-moskvin/claude_monitor/main/install.sh | sh
+#   curl -fsSL https://raw.githubusercontent.com/ivan-moskvin/claudestatus/main/install.sh | sh
 set -eu
 
-REPO="ivan-moskvin/claude_monitor"
+REPO="ivan-moskvin/claudestatus"
 BIN_DIR="${CLAUDESTATUS_BIN_DIR:-$HOME/.local/bin}"
 
 # The messages follow the system language, the same way the binary picks it:
