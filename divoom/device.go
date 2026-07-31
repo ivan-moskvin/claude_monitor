@@ -115,7 +115,7 @@ func (d device) restoreScreen(clockID, independence int) error {
 // nothing but makes the system pick the right interface: walking the interfaces
 // by hand would mean guessing about VPNs and bridges.
 func localIP(target string) (string, error) {
-	conn, err := net.Dial("udp", target+":80")
+	conn, err := net.Dial("udp", net.JoinHostPort(target, "80"))
 	if err != nil {
 		return "", err
 	}

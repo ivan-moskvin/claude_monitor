@@ -138,5 +138,5 @@ func (a *assets) publish(hostIP, hash string, data []byte) string {
 	}
 	a.mu.Unlock()
 
-	return fmt.Sprintf("http://%s:%d%s", hostIP, a.port, path)
+	return "http://" + net.JoinHostPort(hostIP, strconv.Itoa(a.port)) + path
 }
