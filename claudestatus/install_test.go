@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ivan-moskvin/claude_monitor/internal/testenv"
+	"github.com/ivan-moskvin/claudestatus/internal/testenv"
 )
 
 const installedExe = "/usr/local/bin/claudestatus"

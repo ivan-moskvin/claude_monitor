@@ -13,7 +13,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ivan-moskvin/claude_monitor/i18n"
+	"github.com/ivan-moskvin/claudestatus/i18n"
 )
 
 // The cloud directory: it answers with the devices sitting behind the same

@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ivan-moskvin/claude_monitor/i18n"
-	"github.com/ivan-moskvin/claude_monitor/paths"
+	"github.com/ivan-moskvin/claudestatus/i18n"
+	"github.com/ivan-moskvin/claudestatus/paths"
 )
 
 // A snapshot older than this describes the past: Claude Code only refreshes it

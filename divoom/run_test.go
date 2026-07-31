@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ivan-moskvin/claude_monitor/i18n"
-	"github.com/ivan-moskvin/claude_monitor/internal/testenv"
+	"github.com/ivan-moskvin/claudestatus/i18n"
+	"github.com/ivan-moskvin/claudestatus/internal/testenv"
 )
 
 func TestRunHelp(t *testing.T) {

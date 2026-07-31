@@ -10,7 +10,7 @@ import (
 	"net/netip"
 	"time"
 
-	"github.com/ivan-moskvin/claude_monitor/i18n"
+	"github.com/ivan-moskvin/claudestatus/i18n"
 )
 
 type device struct {

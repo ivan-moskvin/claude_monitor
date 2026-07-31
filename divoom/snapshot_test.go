@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ivan-moskvin/claude_monitor/internal/testenv"
+	"github.com/ivan-moskvin/claudestatus/internal/testenv"
 )
 
 func TestUsageWindowFractions(t *testing.T) {

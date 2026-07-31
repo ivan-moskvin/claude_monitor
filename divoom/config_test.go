@@ -5,7 +5,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/ivan-moskvin/claude_monitor/internal/testenv"
+	"github.com/ivan-moskvin/claudestatus/internal/testenv"
 )
 
 // No config means the panel was never turned on — told apart from a broken one,

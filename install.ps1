@@ -1,11 +1,11 @@
 # Installs claudestatus from the latest release. After that the utility looks
 # after itself: claudestatus update to update, claudestatus uninstall to remove.
 #
-#   irm https://raw.githubusercontent.com/ivan-moskvin/claude_monitor/main/install.ps1 | iex
+#   irm https://raw.githubusercontent.com/ivan-moskvin/claudestatus/main/install.ps1 | iex
 
 $ErrorActionPreference = "Stop"
 
-$repo = "ivan-moskvin/claude_monitor"
+$repo = "ivan-moskvin/claudestatus"
 $binDir = if ($env:CLAUDESTATUS_BIN_DIR) { $env:CLAUDESTATUS_BIN_DIR } else { Join-Path $env:LOCALAPPDATA "claudestatus" }
 
 # The messages follow the interface language of the system, the same way the

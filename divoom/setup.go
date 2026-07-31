@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ivan-moskvin/claude_monitor/i18n"
+	"github.com/ivan-moskvin/claudestatus/i18n"
 )
 
 // on looks for the Divoom devices on the network and turns the panel on. The
