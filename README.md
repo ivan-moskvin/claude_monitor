@@ -11,7 +11,8 @@ Claude limits in the Claude Code status line — visible while you work, without
 
 ## Install
 
-**Requires macOS 12 or newer, Windows 10 or newer, or Linux with kernel 3.2 or newer.**
+**Requires macOS 11 or newer, Windows 10 or newer, or Linux with kernel 3.2 or newer.**
+The Linux build is statically linked, so the distribution and its glibc do not matter.
 
 macOS and Linux:
 
@@ -83,10 +84,17 @@ claudestatus divoom preview FILE save a frame to a file without touching the dev
 ```
 
 The device draws the panel by downloading a frame, so on every update the screen
-blinks its loading indicator. Talking to the device is the job of
-[divoomkit](https://github.com/ivan-moskvin/divoomkit), a crate of its own; what
-the firmware really does is written down in its
-[PROTOCOL.md](https://github.com/ivan-moskvin/divoomkit/blob/main/PROTOCOL.md).
+blinks its loading indicator, and frames are not sent faster than it can draw
+them.
+
+Talking to the device is not part of this utility: it is
+[divoomkit](https://github.com/ivan-moskvin/divoomkit), a crate of its own that
+knows nothing about Claude. It finds the devices, draws on a paletted canvas and
+keeps a picture on a screen; what stays here is which device you chose and what
+goes on the panel. If you want your own data on a Times Gate, take the crate —
+what the firmware really does is written down in its
+[PROTOCOL.md](https://github.com/ivan-moskvin/divoomkit/blob/main/PROTOCOL.md),
+and every line of that was found by trying things on a real device.
 
 ## Security
 
