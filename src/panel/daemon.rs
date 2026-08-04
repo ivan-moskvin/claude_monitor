@@ -225,12 +225,19 @@ mod tests {
     fn knows_a_process_that_is_there_from_one_that_is_not() {
         assert!(alive(std::process::id()), "we are running");
 
-        // A process that exited: its pid answers nothing.
-        let mut child = std::process::Command::new("/bin/sh")
-            .arg("-c")
-            .arg("exit 0")
-            .spawn()
-            .unwrap();
+        // A process that exited: its pid answers nothing. The shell that ends
+        // right away is spelled differently on every system.
+        let mut command = if cfg!(windows) {
+            let mut command = std::process::Command::new("cmd");
+            command.args(["/C", "exit"]);
+            command
+        } else {
+            let mut command = std::process::Command::new("/bin/sh");
+            command.args(["-c", "exit 0"]);
+            command
+        };
+
+        let mut child = command.spawn().unwrap();
         let pid = child.id();
         child.wait().unwrap();
         assert!(!alive(pid));
