@@ -16,6 +16,11 @@ use crate::snapshot;
 
 const BAR_WIDTH: usize = 10;
 const SEPARATOR: &str = " · ";
+/// What the strip under the 7d bar is pushed right with. Not a space: Claude
+/// Code wraps the line it is given, and the wrapping strips the leading spaces
+/// off it — the strip would end up under the model name. An empty braille cell
+/// is one column wide and counts as a character, so the indent survives.
+const INDENT: &str = "\u{2800}";
 const FIVE_HOUR_SECONDS: f64 = 5.0 * 60.0 * 60.0;
 const SEVEN_DAY_SECONDS: f64 = 7.0 * 24.0 * 60.0 * 60.0;
 
@@ -155,7 +160,7 @@ fn compose(
     ) {
         (Some(at), Some(left)) => {
             let elapsed = (SEVEN_DAY_SECONDS - left as f64) / SEVEN_DAY_SECONDS * 100.0;
-            format!("{line}\n{}{}", " ".repeat(at), week_strip(elapsed))
+            format!("{line}\n{}{}", INDENT.repeat(at), week_strip(elapsed))
         }
         _ => line,
     }
@@ -441,7 +446,7 @@ mod tests {
         // The strip stands under the bar itself, not under the "7d" labelling it.
         let label_at = first[..first.find("7d").unwrap()].chars().count();
         assert_eq!(
-            strip.chars().take_while(|cell| *cell == ' ').count(),
+            strip.chars().take_while(|cell| *cell == '\u{2800}').count(),
             label_at + "7d ".len(),
             "{line:?}"
         );
