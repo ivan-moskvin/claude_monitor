@@ -166,16 +166,16 @@ fn compose(
     }
 }
 
-/// The strip under the 7d bar: as long as the part of the week that has passed,
+/// The strip under the 7d bar: as wide as the bar, the passed part of the week
 /// in grey. An overline rather than a block: it is thin, and it hangs a few
 /// pixels below the top of its cell — close enough to the bar to be compared
 /// with it, far enough not to touch it.
 fn week_strip(elapsed: f64) -> String {
-    // Only the days that have passed are drawn. The bar above already shows how
-    // wide the whole window is, and a track under it would read as a full one.
+    let passed = cells(elapsed);
     format!(
-        "\x1b[0;38;5;{MARK_BG}m{}\x1b[0m",
-        "‾".repeat(cells(elapsed))
+        "\x1b[0;38;5;{MARK_BG}m{}\x1b[0;38;5;{EMPTY_BG}m{}\x1b[0m",
+        "‾".repeat(passed),
+        "‾".repeat(BAR_WIDTH - passed)
     )
 }
 
@@ -451,11 +451,20 @@ mod tests {
             label_at + "7d ".len(),
             "{line:?}"
         );
-        // Six of the ten cells of the week have passed, and only those are drawn.
-        assert_eq!(strip.matches('\u{203e}').count(), 6);
+        assert_eq!(strip.matches('\u{203e}').count(), BAR_WIDTH);
+        // Six of the ten cells of the week have passed.
+        assert_eq!(passed_cells(line.split_once('\n').unwrap().1), 6);
+    }
 
-        let barely = compose(&json!({}), &limits, None, week * 0.1);
-        assert_eq!(strip_line(&barely).matches('\u{203e}').count(), 1);
+    /// How many cells of the strip are painted as passed.
+    fn passed_cells(strip: &str) -> usize {
+        let (grey, dark) = (
+            format!("\x1b[0;38;5;{MARK_BG}m"),
+            format!("\x1b[0;38;5;{EMPTY_BG}m"),
+        );
+        let (_, painted) = strip.split_once(&grey).expect("a strip has a passed part");
+        let (passed, _) = painted.split_once(&dark).expect("a strip has a left part");
+        passed.chars().count()
     }
 
     #[test]
