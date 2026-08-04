@@ -1,5 +1,9 @@
 # Builds the binaries on every vX.Y.Z tag and publishes them as a release: both
 # install.sh and the utility itself (claudestatus update) download from it.
+#
+# The asset names are the ones the Go build produced and install.sh still
+# expects — claudestatus_<os>_<arch> — so each target spells its own out rather
+# than deriving it from the Rust triple.
 name: release
 
 on:
@@ -9,6 +13,9 @@ on:
 permissions:
   contents: write
 
+env:
+  CARGO_TERM_COLOR: always
+
 jobs:
   # A release that fails its tests is worse than no release: `claudestatus
   # update` pulls it down by itself, onto every machine, with nobody asked.
@@ -16,34 +23,90 @@ jobs:
   tests:
     uses: ./.github/workflows/tests.yml
 
-  release:
+  build:
     needs: tests
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Linux is built against musl: a binary linked to the glibc of the
+          # runner refuses to start on an older distribution, while the Go build
+          # this replaces was static and started anywhere.
+          - target: x86_64-unknown-linux-musl
+            os: ubuntu-latest
+            asset: claudestatus_linux_amd64
+            cross: true
+          - target: aarch64-unknown-linux-musl
+            os: ubuntu-latest
+            asset: claudestatus_linux_arm64
+            cross: true
+          - target: x86_64-apple-darwin
+            os: macos-latest
+            asset: claudestatus_darwin_amd64
+          - target: aarch64-apple-darwin
+            os: macos-latest
+            asset: claudestatus_darwin_arm64
+          - target: x86_64-pc-windows-msvc
+            os: windows-latest
+            asset: claudestatus_windows_amd64.exe
+          - target: aarch64-pc-windows-msvc
+            os: windows-latest
+            asset: claudestatus_windows_arm64.exe
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-go@v5
+      - uses: dtolnay/rust-toolchain@stable
         with:
-          go-version-file: go.mod
+          targets: ${{ matrix.target }}
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.target }}
+
+      - name: Install cross
+        if: matrix.cross
+        run: cargo install cross --locked
 
       - name: Build
+        shell: bash
+        env:
+          # The version is baked in here: a build made outside a tag has none,
+          # counts as outdated and never lights the update mark up.
+          CLAUDESTATUS_VERSION: ${{ github.ref_name }}
         run: |
           set -eu
-          mkdir dist
-          for target in darwin/amd64 darwin/arm64 linux/amd64 linux/arm64 windows/amd64 windows/arm64; do
-            os=${target%/*}
-            arch=${target#*/}
-            name="claudestatus_${os}_${arch}"
-            if [ "$os" = windows ]; then
-              name="${name}.exe"
-            fi
-            CGO_ENABLED=0 GOOS="$os" GOARCH="$arch" go build -trimpath \
-              -ldflags "-s -w -X main.versionOverride=${GITHUB_REF_NAME}" \
-              -o "dist/${name}" ./claudestatus
-          done
-          cd dist && sha256sum * > checksums.txt
+          if [ "${{ matrix.cross }}" = "true" ]; then
+            cross build --release --locked --target "${{ matrix.target }}"
+          else
+            cargo build --release --locked --target "${{ matrix.target }}"
+          fi
+
+          mkdir -p dist
+          built="target/${{ matrix.target }}/release/claudestatus"
+          if [ -f "$built.exe" ]; then built="$built.exe"; fi
+          cp "$built" "dist/${{ matrix.asset }}"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.asset }}
+          path: dist/${{ matrix.asset }}
+          if-no-files-found: error
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      # The sha256sum format, which is what `claudestatus update` reads.
+      - name: Checksums
+        run: cd dist && sha256sum * > checksums.txt
 
       - name: Release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$GITHUB_REF_NAME" dist/* --title "$GITHUB_REF_NAME" --generate-notes
+        run: gh release create "$GITHUB_REF_NAME" dist/* --title "$GITHUB_REF_NAME" --generate-notes --repo "$GITHUB_REPOSITORY"

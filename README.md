@@ -1,7 +1,7 @@
 # claudestatus
 
 ![Tests](./.github/badges/tests.svg)
-![Go](./.github/badges/go.svg)
+![Rust](./.github/badges/rust.svg)
 ![Platforms](./.github/badges/platforms.svg)
 ![Dependencies](./.github/badges/dependencies.svg)
 
@@ -83,8 +83,10 @@ claudestatus divoom preview FILE save a frame to a file without touching the dev
 ```
 
 The device draws the panel by downloading a frame, so on every update the screen
-blinks its loading indicator. The details of the protocol are in
-[divoom/README.md](divoom/README.md).
+blinks its loading indicator. Talking to the device is the job of
+[divoomkit](https://github.com/ivan-moskvin/divoomkit), a crate of its own; what
+the firmware really does is written down in its
+[PROTOCOL.md](https://github.com/ivan-moskvin/divoomkit/blob/main/PROTOCOL.md).
 
 ## Security
 
