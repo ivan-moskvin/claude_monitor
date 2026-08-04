@@ -33,9 +33,9 @@ const CYAN: u8 = 38;
 const UPDATE: u8 = 178;
 const EMPTY_BG: u8 = 237;
 const EMPTY_FG: u8 = 250;
-/// The cell that marks how much of the weekly window has passed: lighter than
-/// the empty part, darker than any of the level colors.
-const MARK_BG: u8 = 245;
+/// The strip that says how much of the weekly window has passed: grey, so that
+/// it is never taken for one of the level colors of a bar.
+const STRIP: u8 = 245;
 const DARK_TEXT: u8 = 16;
 const LIGHT_TEXT: u8 = 231;
 
@@ -166,17 +166,18 @@ fn compose(
     }
 }
 
-/// The strip under the 7d bar: as wide as the bar, the passed part of the week
-/// in grey. An overline rather than a block: it is thin, and it hangs a few
-/// pixels below the top of its cell — close enough to the bar to be compared
-/// with it, far enough not to touch it.
+/// The strip under the 7d bar: the part of the week that has passed, in grey.
+/// An overline rather than a block: it is thin, and it hangs a few pixels below
+/// the top of its cell — close enough to the bar to be compared with it, far
+/// enough not to touch it.
+///
+/// Only the passed part is drawn. A track under it would have to be told apart
+/// by color alone, and a terminal that lifts the contrast of dim colors — the
+/// one in the JetBrains IDEs does — paints it as bright as the strip itself,
+/// leaving a week that always looks over. How wide the whole window is can be
+/// read off the bar above.
 fn week_strip(elapsed: f64) -> String {
-    let passed = cells(elapsed);
-    format!(
-        "\x1b[0;38;5;{MARK_BG}m{}\x1b[0;38;5;{EMPTY_BG}m{}\x1b[0m",
-        "‾".repeat(passed),
-        "‾".repeat(BAR_WIDTH - passed)
-    )
+    format!("\x1b[0;38;5;{STRIP}m{}\x1b[0m", "‾".repeat(cells(elapsed)))
 }
 
 /// The width of a drawn part on screen: what is left once the colors are gone.
@@ -451,20 +452,13 @@ mod tests {
             label_at + "7d ".len(),
             "{line:?}"
         );
-        assert_eq!(strip.matches('\u{203e}').count(), BAR_WIDTH);
-        // Six of the ten cells of the week have passed.
-        assert_eq!(passed_cells(line.split_once('\n').unwrap().1), 6);
-    }
+        // Six of the ten cells of the week have passed, and nothing beyond them
+        // is drawn: a track would only be told apart by color.
+        assert_eq!(strip.matches('\u{203e}').count(), 6);
+        assert!(!strip.contains(&format!("38;5;{EMPTY_BG}")), "{line:?}");
 
-    /// How many cells of the strip are painted as passed.
-    fn passed_cells(strip: &str) -> usize {
-        let (grey, dark) = (
-            format!("\x1b[0;38;5;{MARK_BG}m"),
-            format!("\x1b[0;38;5;{EMPTY_BG}m"),
-        );
-        let (_, painted) = strip.split_once(&grey).expect("a strip has a passed part");
-        let (passed, _) = painted.split_once(&dark).expect("a strip has a left part");
-        passed.chars().count()
+        let barely = compose(&json!({}), &limits, None, week * 0.1);
+        assert_eq!(strip_line(&barely).matches('\u{203e}').count(), 1);
     }
 
     #[test]
