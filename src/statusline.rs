@@ -167,15 +167,15 @@ fn compose(
 }
 
 /// The strip under the 7d bar: as wide as the bar, the passed part of the week
-/// in grey. Drawn along the top edge of the cell — a rule thin enough not to
-/// read as a second bar, and close enough to the bar above to be compared with
-/// it rather than a whole line below.
+/// in grey. An overline rather than a block: it is thin, and it hangs a few
+/// pixels below the top of its cell — close enough to the bar to be compared
+/// with it, far enough not to touch it.
 fn week_strip(elapsed: f64) -> String {
     let passed = cells(elapsed);
     format!(
         "\x1b[0;38;5;{MARK_BG}m{}\x1b[0;38;5;{EMPTY_BG}m{}\x1b[0m",
-        "▔".repeat(passed),
-        "▔".repeat(BAR_WIDTH - passed)
+        "‾".repeat(passed),
+        "‾".repeat(BAR_WIDTH - passed)
     )
 }
 
@@ -451,7 +451,7 @@ mod tests {
             label_at + "7d ".len(),
             "{line:?}"
         );
-        assert_eq!(strip.matches('\u{2594}').count(), BAR_WIDTH);
+        assert_eq!(strip.matches('\u{203e}').count(), BAR_WIDTH);
         // Six of the ten cells of the week have passed.
         assert_eq!(passed_cells(line.split_once('\n').unwrap().1), 6);
     }
