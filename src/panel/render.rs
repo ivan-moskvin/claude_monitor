@@ -6,7 +6,7 @@ use std::time::Duration;
 use divoomkit::{BarStyle, Canvas, Frame, Rgb, Size};
 
 use crate::i18n::{t, tf};
-use crate::panel::usage::{Snapshot, Window};
+use crate::panel::usage::{FIVE_HOUR_SECONDS, SEVEN_DAY_SECONDS, Snapshot, Window};
 
 /// The color of the Claude sparkle in the header.
 const CLAUDE: Rgb = Rgb(0xd9, 0x77, 0x57);
@@ -18,6 +18,11 @@ const BAR_X: i32 = 32;
 const BAR_WIDTH: u32 = 128 - BAR_X as u32 - LABEL_X as u32;
 const BAR_HEIGHT: u32 = 20;
 const ROW_GAP: i32 = 7;
+/// The week row is split in two: the usage above, the week running out below,
+/// together taking the height of an ordinary row.
+const WEEK_BAR_HEIGHT: u32 = 14;
+const WEEK_GAP: i32 = 2;
+const WEEK_ELAPSED_HEIGHT: u32 = BAR_HEIGHT - WEEK_BAR_HEIGHT - WEEK_GAP as u32;
 const HEADER_Y: i32 = 8;
 const SPARK_SIZE: i32 = 17;
 const FIRST_ROW_Y: i32 = 38;
@@ -74,6 +79,7 @@ pub fn draw(state: &Snapshot) -> Result<Frame, String> {
     bar(
         &mut canvas,
         y,
+        BAR_HEIGHT,
         five.fraction(),
         five.tint(),
         &five.percent_label(),
@@ -90,7 +96,8 @@ pub fn draw(state: &Snapshot) -> Result<Frame, String> {
     bar(
         &mut canvas,
         y,
-        five.elapsed_fraction(),
+        BAR_HEIGHT,
+        five.elapsed_fraction(FIVE_HOUR_SECONDS),
         reset_tint(five),
         &reset_label(five),
     );
@@ -103,22 +110,51 @@ pub fn draw(state: &Snapshot) -> Result<Frame, String> {
         Rgb::GREY,
         "7D",
     );
-    bar(
-        &mut canvas,
-        y,
-        week.fraction(),
-        week.tint(),
-        &week.percent_label(),
-    );
+    // The grey strip below the week is the week itself running out. Usage ahead
+    // of it is spent faster than the window gives it back; behind it there is
+    // room to spare. Without a resets_at there is no such strip to draw, and the
+    // usage takes the whole row.
+    if week.timed() {
+        bar(
+            &mut canvas,
+            y,
+            WEEK_BAR_HEIGHT,
+            week.fraction(),
+            week.tint(),
+            &week.percent_label(),
+        );
+        canvas.bar(
+            (
+                BAR_X,
+                y + (WEEK_BAR_HEIGHT as i32) + WEEK_GAP,
+                BAR_WIDTH,
+                WEEK_ELAPSED_HEIGHT,
+            ),
+            week.elapsed_fraction(SEVEN_DAY_SECONDS),
+            BarStyle {
+                fill: Rgb::GREY,
+                ..Default::default()
+            },
+        );
+    } else {
+        bar(
+            &mut canvas,
+            y,
+            BAR_HEIGHT,
+            week.fraction(),
+            week.tint(),
+            &week.percent_label(),
+        );
+    }
 
     canvas
         .finish()
         .map_err(|err| tf!("could not draw the panel: {0}", err))
 }
 
-fn bar(canvas: &mut Canvas, y: i32, fraction: f32, fill: Rgb, label: &str) {
+fn bar(canvas: &mut Canvas, y: i32, height: u32, fraction: f32, fill: Rgb, label: &str) {
     canvas.bar(
-        (BAR_X, y, BAR_WIDTH, BAR_HEIGHT),
+        (BAR_X, y, BAR_WIDTH, height),
         fraction,
         BarStyle {
             fill,
@@ -274,7 +310,29 @@ mod tests {
     #[test]
     fn draws_something_else_when_there_are_no_numbers() {
         let empty = draw(&Snapshot::default()).unwrap();
-        let with_numbers = draw(&crate::panel::usage::for_test(42.0, 9000)).unwrap();
+        let with_numbers = draw(&crate::panel::usage::for_test(42.0, 9000, 400_000)).unwrap();
         assert_ne!(empty.hash(), with_numbers.hash());
+    }
+
+    #[test]
+    fn shows_how_much_of_the_week_has_passed() {
+        let day = 24 * 3600;
+        let early = draw(&crate::panel::usage::for_test(42.0, 9000, 6 * day)).unwrap();
+        let late = draw(&crate::panel::usage::for_test(42.0, 9000, day)).unwrap();
+        assert_ne!(
+            early.hash(),
+            late.hash(),
+            "the same usage at a different point of the week"
+        );
+    }
+
+    #[test]
+    fn the_week_row_stays_within_its_row() {
+        assert_eq!(
+            WEEK_BAR_HEIGHT + WEEK_GAP as u32 + WEEK_ELAPSED_HEIGHT,
+            BAR_HEIGHT
+        );
+        // The percentage is written at scale 2 and must still fit the shortened bar.
+        assert!(WEEK_BAR_HEIGHT >= (GLYPH_HEIGHT * 2) as u32);
     }
 }
