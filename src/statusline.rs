@@ -15,6 +15,7 @@ use crate::i18n::tf;
 use crate::snapshot;
 
 const BAR_WIDTH: usize = 10;
+const SEPARATOR: &str = " · ";
 const FIVE_HOUR_SECONDS: f64 = 5.0 * 60.0 * 60.0;
 const SEVEN_DAY_SECONDS: f64 = 7.0 * 24.0 * 60.0 * 60.0;
 
@@ -118,19 +119,20 @@ fn compose(
     // The weekly window goes last: it moves slowly and gets in the way of what
     // matters right now.
     let week = limits.get("seven_day");
+    let mut week_bar_at = None;
 
     if let Some(used) = week.and_then(|window| percentage(window, "used_percentage")) {
-        let (label, color) = (percent_label(used), usage_color(used));
-        // The mark says where the week itself has got to. Without a resets_at
-        // there is nothing to compare the usage against, and the bar is plain.
-        let drawn = match week.and_then(|window| seconds_left(window, now)) {
-            Some(left) => {
-                let elapsed = (SEVEN_DAY_SECONDS - left as f64) / SEVEN_DAY_SECONDS * 100.0;
-                marked_bar(used, &label, color, elapsed)
-            }
-            None => labeled_bar(used, &label, color),
+        let drawn = parts.join(SEPARATOR);
+        let separator = if drawn.is_empty() {
+            0
+        } else {
+            SEPARATOR.chars().count()
         };
-        parts.push(format!("7d {drawn}"));
+        week_bar_at = Some(width(&drawn) + separator + "7d ".len());
+        parts.push(format!(
+            "7d {}",
+            labeled_bar(used, &percent_label(used), usage_color(used))
+        ));
     }
 
     // The update mark comes at the very end: it is not about the current session
@@ -142,7 +144,47 @@ fn compose(
     if parts.is_empty() {
         return "—".to_string();
     }
-    parts.join(" · ")
+    let line = parts.join(SEPARATOR);
+
+    // How much of the week has passed goes on a second line, right under the 7d
+    // bar: inside the bar there is only room for one value, and two of them side
+    // by side is what the eye has to compare here.
+    match (
+        week_bar_at,
+        week.and_then(|window| seconds_left(window, now)),
+    ) {
+        (Some(at), Some(left)) => {
+            let elapsed = (SEVEN_DAY_SECONDS - left as f64) / SEVEN_DAY_SECONDS * 100.0;
+            format!("{line}\n{}{}", " ".repeat(at), week_strip(elapsed))
+        }
+        _ => line,
+    }
+}
+
+/// The strip under the 7d bar: as wide as the bar, the passed part of the week
+/// in grey. Drawn with an underscore-height block so it reads as a rule under
+/// the bar and not as a second bar of its own.
+fn week_strip(elapsed: f64) -> String {
+    let passed = cells(elapsed);
+    format!(
+        "\x1b[0;38;5;{MARK_BG}m{}\x1b[0;38;5;{EMPTY_BG}m{}\x1b[0m",
+        "▁".repeat(passed),
+        "▁".repeat(BAR_WIDTH - passed)
+    )
+}
+
+/// The width of a drawn part on screen: what is left once the colors are gone.
+fn width(drawn: &str) -> usize {
+    let mut cells = 0;
+    let mut rest = drawn;
+    while let Some(start) = rest.find('\x1b') {
+        cells += rest[..start].chars().count();
+        match rest[start..].find('m') {
+            Some(end) => rest = &rest[start + end + 1..],
+            None => return cells,
+        }
+    }
+    cells + rest.chars().count()
 }
 
 /// Draws a bar with the label centered inside it. The background spans the full
@@ -161,38 +203,6 @@ fn labeled_bar(percentage: f64, label: &str, color: u8) -> String {
     format!(
         "\x1b[1;48;5;{color};38;5;{text_color}m{inside}\x1b[0;48;5;{EMPTY_BG};38;5;{EMPTY_FG}m{outside}\x1b[0m"
     )
-}
-
-/// The same bar with one cell painted grey: how much of the window itself has
-/// passed. A fill that has run past the mark is spent faster than the window
-/// gives it back, one that trails it leaves room to spare.
-fn marked_bar(percentage: f64, label: &str, color: u8, elapsed: f64) -> String {
-    let text = centered(label);
-    let filled = cells(percentage);
-    // The mark stands on the cell the elapsed time reaches into, so a window
-    // that has only just begun still marks its first cell rather than none.
-    let mark = cells(elapsed).clamp(1, BAR_WIDTH) - 1;
-
-    let mut out = String::new();
-    let mut painted = None;
-    for (cell, symbol) in text.iter().enumerate() {
-        let style = if cell == mark {
-            (0, MARK_BG, DARK_TEXT)
-        } else if cell < filled {
-            (1, color, text_color(color))
-        } else {
-            (0, EMPTY_BG, EMPTY_FG)
-        };
-        if painted != Some(style) {
-            let (weight, background, foreground) = style;
-            out.push_str(&format!(
-                "\x1b[{weight};48;5;{background};38;5;{foreground}m"
-            ));
-            painted = Some(style);
-        }
-        out.push(*symbol);
-    }
-    out + "\x1b[0m"
 }
 
 /// The label in the middle of a bar-wide row of spaces. A label of odd length
@@ -413,40 +423,54 @@ mod tests {
         assert_eq!(filled_cells(&labeled_bar(42.0, "42%", GREEN)), 4);
     }
 
-    /// Which of the ten cells carries the grey mark.
-    fn marked_cell(bar: &str) -> usize {
-        let mark = format!("\x1b[0;48;5;{MARK_BG};38;5;{DARK_TEXT}m");
-        let (before, _) = bar.split_once(&mark).expect("a marked bar has a mark");
-        plain(before).chars().count()
+    /// The second line as the eye sees it, colors and all cut away.
+    fn strip_line(line: &str) -> String {
+        plain(line.split_once('\n').expect("a strip under the line").1)
     }
 
     #[test]
-    fn marks_how_much_of_the_week_has_passed() {
-        assert_eq!(marked_cell(&marked_bar(11.0, "11%", GREEN, 60.0)), 5);
-        // The mark sits on the cell the time reaches into, never outside the bar.
-        assert_eq!(marked_cell(&marked_bar(11.0, "11%", GREEN, 0.0)), 0);
-        assert_eq!(marked_cell(&marked_bar(11.0, "11%", GREEN, 100.0)), 9);
-        // A fill that has run past the mark still leaves it visible.
-        assert_eq!(marked_cell(&marked_bar(78.0, "78%", ORANGE, 30.0)), 2);
-        assert_eq!(
-            plain(&marked_bar(78.0, "78%", ORANGE, 30.0))
-                .chars()
-                .count(),
-            BAR_WIDTH
-        );
-    }
-
-    #[test]
-    fn marks_the_week_only_when_it_says_when_it_resets() {
-        let ticking = limits_of(json!({
-            "seven_day": {"used_percentage": 11.0, "resets_at": 604_800.0},
+    fn draws_how_much_of_the_week_has_passed_under_the_bar() {
+        let week = 7.0 * 24.0 * 3600.0;
+        let limits = limits_of(json!({
+            "five_hour": {"used_percentage": 3.0},
+            "seven_day": {"used_percentage": 11.0, "resets_at": week},
         }));
-        let line = compose(&json!({}), &ticking, None, 604_800.0 / 2.0);
-        assert!(line.contains(&format!("48;5;{MARK_BG}")), "{line}");
+        let line = compose(&json!({}), &limits, None, week * 0.6);
+        let (first, strip) = (plain(&line), strip_line(&line));
 
+        // The strip stands under the bar itself, not under the "7d" labelling it.
+        let label_at = first[..first.find("7d").unwrap()].chars().count();
+        assert_eq!(
+            strip.chars().take_while(|cell| *cell == ' ').count(),
+            label_at + "7d ".len(),
+            "{line:?}"
+        );
+        assert_eq!(strip.matches('\u{2581}').count(), BAR_WIDTH);
+        // Six of the ten cells of the week have passed.
+        assert_eq!(passed_cells(line.split_once('\n').unwrap().1), 6);
+    }
+
+    /// How many cells of the strip are painted as passed.
+    fn passed_cells(strip: &str) -> usize {
+        let (grey, dark) = (
+            format!("\x1b[0;38;5;{MARK_BG}m"),
+            format!("\x1b[0;38;5;{EMPTY_BG}m"),
+        );
+        let (_, painted) = strip.split_once(&grey).expect("a strip has a passed part");
+        let (passed, _) = painted.split_once(&dark).expect("a strip has a left part");
+        passed.chars().count()
+    }
+
+    #[test]
+    fn draws_the_strip_only_when_the_week_says_when_it_resets() {
         let timeless = limits_of(json!({"seven_day": {"used_percentage": 11.0}}));
         let line = compose(&json!({}), &timeless, None, 0.0);
-        assert!(!line.contains(&format!("48;5;{MARK_BG}")), "{line}");
+        assert!(!line.contains('\n'), "{line:?}");
+
+        // A week that has already reset has no time left to draw either.
+        let over = limits_of(json!({"seven_day": {"used_percentage": 11.0, "resets_at": 100.0}}));
+        let line = compose(&json!({}), &over, None, 200.0);
+        assert!(!line.contains('\n'), "{line:?}");
     }
 
     #[test]
