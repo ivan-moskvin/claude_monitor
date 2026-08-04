@@ -15,9 +15,10 @@ use crate::snapshot::NAME;
 /// during a session.
 const STALE_AFTER: Duration = Duration::from_secs(90);
 
-/// The length of the five-hour window — how much of it has passed is counted
-/// against this.
-const FIVE_HOUR_SECONDS: f64 = 5.0 * 60.0 * 60.0;
+/// The lengths of the windows — how much of one has passed is counted against
+/// these, because `resets_at` says when a window ends and never when it began.
+pub const FIVE_HOUR_SECONDS: f64 = 5.0 * 60.0 * 60.0;
+pub const SEVEN_DAY_SECONDS: f64 = 7.0 * 24.0 * 60.0 * 60.0;
 
 #[derive(Debug, Default, Clone)]
 pub struct Snapshot {
@@ -148,11 +149,17 @@ impl Window {
         (self.used / 100.0) as f32
     }
 
-    pub fn elapsed_fraction(&self) -> f32 {
+    pub fn elapsed_fraction(&self, window_seconds: f64) -> f32 {
         if self.expired || self.seconds_left <= 0 {
             return 1.0;
         }
-        ((FIVE_HOUR_SECONDS - self.seconds_left as f64) / FIVE_HOUR_SECONDS) as f32
+        (((window_seconds - self.seconds_left as f64) / window_seconds) as f32).clamp(0.0, 1.0)
+    }
+
+    /// Whether we know where in its window the moment is. A window Claude Code
+    /// reported without a `resets_at` has a percentage and no clock.
+    pub fn timed(&self) -> bool {
+        self.present && (self.expired || self.seconds_left > 0)
     }
 
     pub fn percent_label(&self) -> String {
@@ -226,8 +233,8 @@ fn days_from_civil(year: i64, month: i64, day: i64) -> i64 {
 
 /// A snapshot with numbers in it, for the tests of whoever draws them.
 #[cfg(test)]
-pub fn for_test(used: f64, seconds_left: i64) -> Snapshot {
-    let window = Window {
+pub fn for_test(used: f64, five_left: i64, week_left: i64) -> Snapshot {
+    let window = |seconds_left| Window {
         used,
         seconds_left,
         present: true,
@@ -235,8 +242,8 @@ pub fn for_test(used: f64, seconds_left: i64) -> Snapshot {
     };
     Snapshot {
         windows: [
-            ("five_hour".to_string(), window),
-            ("seven_day".to_string(), window),
+            ("five_hour".to_string(), window(five_left)),
+            ("seven_day".to_string(), window(week_left)),
         ]
         .into(),
         ..Default::default()
@@ -340,14 +347,43 @@ mod tests {
             present: true,
             ..Default::default()
         };
-        assert!((half.elapsed_fraction() - 0.5).abs() < 0.001);
+        assert!((half.elapsed_fraction(FIVE_HOUR_SECONDS) - 0.5).abs() < 0.001);
+
+        let week = Window {
+            seconds_left: 3 * 24 * 3600 + 12 * 3600,
+            present: true,
+            ..Default::default()
+        };
+        assert!((week.elapsed_fraction(SEVEN_DAY_SECONDS) - 0.5).abs() < 0.001);
 
         let over = Window {
             expired: true,
             present: true,
             ..Default::default()
         };
-        assert_eq!(over.elapsed_fraction(), 1.0);
+        assert_eq!(over.elapsed_fraction(SEVEN_DAY_SECONDS), 1.0);
+    }
+
+    #[test]
+    fn knows_whether_the_window_has_a_clock() {
+        assert!(
+            !Window {
+                used: 8.0,
+                present: true,
+                ..Default::default()
+            }
+            .timed(),
+            "a window reported without a resets_at"
+        );
+        assert!(
+            Window {
+                seconds_left: 60,
+                present: true,
+                ..Default::default()
+            }
+            .timed()
+        );
+        assert!(!Window::default().timed());
     }
 
     #[test]

@@ -15,7 +15,14 @@ use crate::i18n::tf;
 use crate::snapshot;
 
 const BAR_WIDTH: usize = 10;
+const SEPARATOR: &str = " · ";
+/// What the strip under the 7d bar is pushed right with. Not a space: Claude
+/// Code wraps the line it is given, and the wrapping strips the leading spaces
+/// off it — the strip would end up under the model name. An empty braille cell
+/// is one column wide and counts as a character, so the indent survives.
+const INDENT: &str = "\u{2800}";
 const FIVE_HOUR_SECONDS: f64 = 5.0 * 60.0 * 60.0;
+const SEVEN_DAY_SECONDS: f64 = 7.0 * 24.0 * 60.0 * 60.0;
 
 /// Colors of the 256-color palette. Usage bars are painted by threshold, the
 /// reset bar is always cyan — it shows time, not risk.
@@ -26,6 +33,9 @@ const CYAN: u8 = 38;
 const UPDATE: u8 = 178;
 const EMPTY_BG: u8 = 237;
 const EMPTY_FG: u8 = 250;
+/// The cell that marks how much of the weekly window has passed: lighter than
+/// the empty part, darker than any of the level colors.
+const MARK_BG: u8 = 245;
 const DARK_TEXT: u8 = 16;
 const LIGHT_TEXT: u8 = 231;
 
@@ -113,10 +123,17 @@ fn compose(
 
     // The weekly window goes last: it moves slowly and gets in the way of what
     // matters right now.
-    if let Some(used) = limits
-        .get("seven_day")
-        .and_then(|window| percentage(window, "used_percentage"))
-    {
+    let week = limits.get("seven_day");
+    let mut week_bar_at = None;
+
+    if let Some(used) = week.and_then(|window| percentage(window, "used_percentage")) {
+        let drawn = parts.join(SEPARATOR);
+        let separator = if drawn.is_empty() {
+            0
+        } else {
+            SEPARATOR.chars().count()
+        };
+        week_bar_at = Some(width(&drawn) + separator + "7d ".len());
         parts.push(format!(
             "7d {}",
             labeled_bar(used, &percent_label(used), usage_color(used))
@@ -132,33 +149,58 @@ fn compose(
     if parts.is_empty() {
         return "—".to_string();
     }
-    parts.join(" · ")
+    let line = parts.join(SEPARATOR);
+
+    // How much of the week has passed goes on a second line, right under the 7d
+    // bar: inside the bar there is only room for one value, and two of them side
+    // by side is what the eye has to compare here.
+    match (
+        week_bar_at,
+        week.and_then(|window| seconds_left(window, now)),
+    ) {
+        (Some(at), Some(left)) => {
+            let elapsed = (SEVEN_DAY_SECONDS - left as f64) / SEVEN_DAY_SECONDS * 100.0;
+            format!("{line}\n{}{}", INDENT.repeat(at), week_strip(elapsed))
+        }
+        _ => line,
+    }
+}
+
+/// The strip under the 7d bar: as wide as the bar, the passed part of the week
+/// in grey. An overline rather than a block: it is thin, and it hangs a few
+/// pixels below the top of its cell — close enough to the bar to be compared
+/// with it, far enough not to touch it.
+fn week_strip(elapsed: f64) -> String {
+    let passed = cells(elapsed);
+    format!(
+        "\x1b[0;38;5;{MARK_BG}m{}\x1b[0;38;5;{EMPTY_BG}m{}\x1b[0m",
+        "‾".repeat(passed),
+        "‾".repeat(BAR_WIDTH - passed)
+    )
+}
+
+/// The width of a drawn part on screen: what is left once the colors are gone.
+fn width(drawn: &str) -> usize {
+    let mut cells = 0;
+    let mut rest = drawn;
+    while let Some(start) = rest.find('\x1b') {
+        cells += rest[..start].chars().count();
+        match rest[start..].find('m') {
+            Some(end) => rest = &rest[start + end + 1..],
+            None => return cells,
+        }
+    }
+    cells + rest.chars().count()
 }
 
 /// Draws a bar with the label centered inside it. The background spans the full
 /// width — the filled part in the level color, the rest dark grey — so the edge
 /// of the bar reads without a frame.
 fn labeled_bar(percentage: f64, label: &str, color: u8) -> String {
-    let mut label: Vec<char> = label.chars().collect();
-    label.truncate(BAR_WIDTH);
+    let text = centered(label);
+    let filled = cells(percentage);
 
-    // A label of odd length does not center exactly — one space is left over.
-    // Put it on the left: otherwise "12%" and "39m" drift noticeably towards the
-    // left edge of the bar.
-    let pad = BAR_WIDTH - label.len();
-    let left = pad.div_ceil(2);
-    let text: Vec<char> = " "
-        .repeat(left)
-        .chars()
-        .chain(label)
-        .chain(" ".repeat(pad - left).chars())
-        .collect();
-
-    let filled = (percentage / 100.0 * BAR_WIDTH as f64)
-        .round_ties_even()
-        .clamp(0.0, BAR_WIDTH as f64) as usize;
-
-    let text_color = if color == RED { LIGHT_TEXT } else { DARK_TEXT };
+    let text_color = text_color(color);
     let (inside, outside): (String, String) = (
         text[..filled].iter().collect(),
         text[filled..].iter().collect(),
@@ -167,6 +209,32 @@ fn labeled_bar(percentage: f64, label: &str, color: u8) -> String {
     format!(
         "\x1b[1;48;5;{color};38;5;{text_color}m{inside}\x1b[0;48;5;{EMPTY_BG};38;5;{EMPTY_FG}m{outside}\x1b[0m"
     )
+}
+
+/// The label in the middle of a bar-wide row of spaces. A label of odd length
+/// does not center exactly — the leftover space goes on the left: otherwise
+/// "12%" and "39m" drift noticeably towards the left edge of the bar.
+fn centered(label: &str) -> Vec<char> {
+    let mut label: Vec<char> = label.chars().collect();
+    label.truncate(BAR_WIDTH);
+
+    let pad = BAR_WIDTH - label.len();
+    let left = pad.div_ceil(2);
+    " ".repeat(left)
+        .chars()
+        .chain(label)
+        .chain(" ".repeat(pad - left).chars())
+        .collect()
+}
+
+fn cells(percentage: f64) -> usize {
+    (percentage / 100.0 * BAR_WIDTH as f64)
+        .round_ties_even()
+        .clamp(0.0, BAR_WIDTH as f64) as usize
+}
+
+fn text_color(color: u8) -> u8 {
+    if color == RED { LIGHT_TEXT } else { DARK_TEXT }
 }
 
 fn usage_color(percentage: f64) -> u8 {
@@ -359,6 +427,56 @@ mod tests {
         assert_eq!(filled_cells(&labeled_bar(0.0, "", GREEN)), 0);
         assert_eq!(filled_cells(&labeled_bar(100.0, "", GREEN)), 10);
         assert_eq!(filled_cells(&labeled_bar(42.0, "42%", GREEN)), 4);
+    }
+
+    /// The second line as the eye sees it, colors and all cut away.
+    fn strip_line(line: &str) -> String {
+        plain(line.split_once('\n').expect("a strip under the line").1)
+    }
+
+    #[test]
+    fn draws_how_much_of_the_week_has_passed_under_the_bar() {
+        let week = 7.0 * 24.0 * 3600.0;
+        let limits = limits_of(json!({
+            "five_hour": {"used_percentage": 3.0},
+            "seven_day": {"used_percentage": 11.0, "resets_at": week},
+        }));
+        let line = compose(&json!({}), &limits, None, week * 0.6);
+        let (first, strip) = (plain(&line), strip_line(&line));
+
+        // The strip stands under the bar itself, not under the "7d" labelling it.
+        let label_at = first[..first.find("7d").unwrap()].chars().count();
+        assert_eq!(
+            strip.chars().take_while(|cell| *cell == '\u{2800}').count(),
+            label_at + "7d ".len(),
+            "{line:?}"
+        );
+        assert_eq!(strip.matches('\u{203e}').count(), BAR_WIDTH);
+        // Six of the ten cells of the week have passed.
+        assert_eq!(passed_cells(line.split_once('\n').unwrap().1), 6);
+    }
+
+    /// How many cells of the strip are painted as passed.
+    fn passed_cells(strip: &str) -> usize {
+        let (grey, dark) = (
+            format!("\x1b[0;38;5;{MARK_BG}m"),
+            format!("\x1b[0;38;5;{EMPTY_BG}m"),
+        );
+        let (_, painted) = strip.split_once(&grey).expect("a strip has a passed part");
+        let (passed, _) = painted.split_once(&dark).expect("a strip has a left part");
+        passed.chars().count()
+    }
+
+    #[test]
+    fn draws_the_strip_only_when_the_week_says_when_it_resets() {
+        let timeless = limits_of(json!({"seven_day": {"used_percentage": 11.0}}));
+        let line = compose(&json!({}), &timeless, None, 0.0);
+        assert!(!line.contains('\n'), "{line:?}");
+
+        // A week that has already reset has no time left to draw either.
+        let over = limits_of(json!({"seven_day": {"used_percentage": 11.0, "resets_at": 100.0}}));
+        let line = compose(&json!({}), &over, None, 200.0);
+        assert!(!line.contains('\n'), "{line:?}");
     }
 
     #[test]
