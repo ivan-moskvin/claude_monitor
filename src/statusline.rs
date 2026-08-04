@@ -16,6 +16,7 @@ use crate::snapshot;
 
 const BAR_WIDTH: usize = 10;
 const FIVE_HOUR_SECONDS: f64 = 5.0 * 60.0 * 60.0;
+const SEVEN_DAY_SECONDS: f64 = 7.0 * 24.0 * 60.0 * 60.0;
 
 /// Colors of the 256-color palette. Usage bars are painted by threshold, the
 /// reset bar is always cyan — it shows time, not risk.
@@ -26,6 +27,9 @@ const CYAN: u8 = 38;
 const UPDATE: u8 = 178;
 const EMPTY_BG: u8 = 237;
 const EMPTY_FG: u8 = 250;
+/// The cell that marks how much of the weekly window has passed: lighter than
+/// the empty part, darker than any of the level colors.
+const MARK_BG: u8 = 245;
 const DARK_TEXT: u8 = 16;
 const LIGHT_TEXT: u8 = 231;
 
@@ -113,14 +117,20 @@ fn compose(
 
     // The weekly window goes last: it moves slowly and gets in the way of what
     // matters right now.
-    if let Some(used) = limits
-        .get("seven_day")
-        .and_then(|window| percentage(window, "used_percentage"))
-    {
-        parts.push(format!(
-            "7d {}",
-            labeled_bar(used, &percent_label(used), usage_color(used))
-        ));
+    let week = limits.get("seven_day");
+
+    if let Some(used) = week.and_then(|window| percentage(window, "used_percentage")) {
+        let (label, color) = (percent_label(used), usage_color(used));
+        // The mark says where the week itself has got to. Without a resets_at
+        // there is nothing to compare the usage against, and the bar is plain.
+        let drawn = match week.and_then(|window| seconds_left(window, now)) {
+            Some(left) => {
+                let elapsed = (SEVEN_DAY_SECONDS - left as f64) / SEVEN_DAY_SECONDS * 100.0;
+                marked_bar(used, &label, color, elapsed)
+            }
+            None => labeled_bar(used, &label, color),
+        };
+        parts.push(format!("7d {drawn}"));
     }
 
     // The update mark comes at the very end: it is not about the current session
@@ -139,26 +149,10 @@ fn compose(
 /// width — the filled part in the level color, the rest dark grey — so the edge
 /// of the bar reads without a frame.
 fn labeled_bar(percentage: f64, label: &str, color: u8) -> String {
-    let mut label: Vec<char> = label.chars().collect();
-    label.truncate(BAR_WIDTH);
+    let text = centered(label);
+    let filled = cells(percentage);
 
-    // A label of odd length does not center exactly — one space is left over.
-    // Put it on the left: otherwise "12%" and "39m" drift noticeably towards the
-    // left edge of the bar.
-    let pad = BAR_WIDTH - label.len();
-    let left = pad.div_ceil(2);
-    let text: Vec<char> = " "
-        .repeat(left)
-        .chars()
-        .chain(label)
-        .chain(" ".repeat(pad - left).chars())
-        .collect();
-
-    let filled = (percentage / 100.0 * BAR_WIDTH as f64)
-        .round_ties_even()
-        .clamp(0.0, BAR_WIDTH as f64) as usize;
-
-    let text_color = if color == RED { LIGHT_TEXT } else { DARK_TEXT };
+    let text_color = text_color(color);
     let (inside, outside): (String, String) = (
         text[..filled].iter().collect(),
         text[filled..].iter().collect(),
@@ -167,6 +161,64 @@ fn labeled_bar(percentage: f64, label: &str, color: u8) -> String {
     format!(
         "\x1b[1;48;5;{color};38;5;{text_color}m{inside}\x1b[0;48;5;{EMPTY_BG};38;5;{EMPTY_FG}m{outside}\x1b[0m"
     )
+}
+
+/// The same bar with one cell painted grey: how much of the window itself has
+/// passed. A fill that has run past the mark is spent faster than the window
+/// gives it back, one that trails it leaves room to spare.
+fn marked_bar(percentage: f64, label: &str, color: u8, elapsed: f64) -> String {
+    let text = centered(label);
+    let filled = cells(percentage);
+    // The mark stands on the cell the elapsed time reaches into, so a window
+    // that has only just begun still marks its first cell rather than none.
+    let mark = cells(elapsed).clamp(1, BAR_WIDTH) - 1;
+
+    let mut out = String::new();
+    let mut painted = None;
+    for (cell, symbol) in text.iter().enumerate() {
+        let style = if cell == mark {
+            (0, MARK_BG, DARK_TEXT)
+        } else if cell < filled {
+            (1, color, text_color(color))
+        } else {
+            (0, EMPTY_BG, EMPTY_FG)
+        };
+        if painted != Some(style) {
+            let (weight, background, foreground) = style;
+            out.push_str(&format!(
+                "\x1b[{weight};48;5;{background};38;5;{foreground}m"
+            ));
+            painted = Some(style);
+        }
+        out.push(*symbol);
+    }
+    out + "\x1b[0m"
+}
+
+/// The label in the middle of a bar-wide row of spaces. A label of odd length
+/// does not center exactly — the leftover space goes on the left: otherwise
+/// "12%" and "39m" drift noticeably towards the left edge of the bar.
+fn centered(label: &str) -> Vec<char> {
+    let mut label: Vec<char> = label.chars().collect();
+    label.truncate(BAR_WIDTH);
+
+    let pad = BAR_WIDTH - label.len();
+    let left = pad.div_ceil(2);
+    " ".repeat(left)
+        .chars()
+        .chain(label)
+        .chain(" ".repeat(pad - left).chars())
+        .collect()
+}
+
+fn cells(percentage: f64) -> usize {
+    (percentage / 100.0 * BAR_WIDTH as f64)
+        .round_ties_even()
+        .clamp(0.0, BAR_WIDTH as f64) as usize
+}
+
+fn text_color(color: u8) -> u8 {
+    if color == RED { LIGHT_TEXT } else { DARK_TEXT }
 }
 
 fn usage_color(percentage: f64) -> u8 {
@@ -359,6 +411,42 @@ mod tests {
         assert_eq!(filled_cells(&labeled_bar(0.0, "", GREEN)), 0);
         assert_eq!(filled_cells(&labeled_bar(100.0, "", GREEN)), 10);
         assert_eq!(filled_cells(&labeled_bar(42.0, "42%", GREEN)), 4);
+    }
+
+    /// Which of the ten cells carries the grey mark.
+    fn marked_cell(bar: &str) -> usize {
+        let mark = format!("\x1b[0;48;5;{MARK_BG};38;5;{DARK_TEXT}m");
+        let (before, _) = bar.split_once(&mark).expect("a marked bar has a mark");
+        plain(before).chars().count()
+    }
+
+    #[test]
+    fn marks_how_much_of_the_week_has_passed() {
+        assert_eq!(marked_cell(&marked_bar(11.0, "11%", GREEN, 60.0)), 5);
+        // The mark sits on the cell the time reaches into, never outside the bar.
+        assert_eq!(marked_cell(&marked_bar(11.0, "11%", GREEN, 0.0)), 0);
+        assert_eq!(marked_cell(&marked_bar(11.0, "11%", GREEN, 100.0)), 9);
+        // A fill that has run past the mark still leaves it visible.
+        assert_eq!(marked_cell(&marked_bar(78.0, "78%", ORANGE, 30.0)), 2);
+        assert_eq!(
+            plain(&marked_bar(78.0, "78%", ORANGE, 30.0))
+                .chars()
+                .count(),
+            BAR_WIDTH
+        );
+    }
+
+    #[test]
+    fn marks_the_week_only_when_it_says_when_it_resets() {
+        let ticking = limits_of(json!({
+            "seven_day": {"used_percentage": 11.0, "resets_at": 604_800.0},
+        }));
+        let line = compose(&json!({}), &ticking, None, 604_800.0 / 2.0);
+        assert!(line.contains(&format!("48;5;{MARK_BG}")), "{line}");
+
+        let timeless = limits_of(json!({"seven_day": {"used_percentage": 11.0}}));
+        let line = compose(&json!({}), &timeless, None, 0.0);
+        assert!(!line.contains(&format!("48;5;{MARK_BG}")), "{line}");
     }
 
     #[test]
