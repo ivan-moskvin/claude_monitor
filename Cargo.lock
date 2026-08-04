@@ -59,7 +59,7 @@ checksum = "6e4de3bc4ea267985becf712dc6d9eed8b04c953b3fcfb339ebc87acd9804901"
 
 [[package]]
 name = "claudestatus"
-version = "0.1.0"
+version = "2.0.0"
 dependencies = [
  "dirs",
  "divoomkit",
@@ -192,7 +192,7 @@ dependencies = [
 [[package]]
 name = "divoomkit"
 version = "0.1.0"
-source = "git+https://github.com/ivan-moskvin/divoomkit?branch=main#153d2528ba4afb4f07a8de6e82cb80e420024a06"
+source = "git+https://github.com/ivan-moskvin/divoomkit?tag=v0.1.0#5d0e66780c509f4e41da2eabd422032cd028e797"
 dependencies = [
  "gif",
  "if-addrs",

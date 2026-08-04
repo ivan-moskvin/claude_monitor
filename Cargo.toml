@@ -1,6 +1,6 @@
 [package]
 name = "claudestatus"
-version = "0.1.0"
+version = "2.0.0"
 edition = "2024"
 rust-version = "1.88"
 description = "Claude limits in the Claude Code status line"
@@ -13,7 +13,9 @@ name = "claudestatus"
 path = "src/main.rs"
 
 [dependencies]
-divoomkit = { git = "https://github.com/ivan-moskvin/divoomkit", branch = "main" }
+# Pinned to a tag, not a branch: a release must be reproducible, and a commit
+# in the crate must not walk into the next build of this one on its own.
+divoomkit = { git = "https://github.com/ivan-moskvin/divoomkit", tag = "v0.1.0" }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = { version = "1.0", features = ["preserve_order"] }
 ureq = { version = "3.3", features = ["json"] }
