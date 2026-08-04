@@ -1,0 +1,35 @@
+[package]
+name = "claudestatus"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.88"
+description = "Claude limits in the Claude Code status line"
+repository = "https://github.com/ivan-moskvin/claudestatus"
+license = "MIT"
+publish = false
+
+[[bin]]
+name = "claudestatus"
+path = "src/main.rs"
+
+[dependencies]
+divoomkit = { path = "../divoomkit" }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = { version = "1.0", features = ["preserve_order"] }
+ureq = { version = "3.3", features = ["json"] }
+sha2 = "0.11"
+dirs = "6.0"
+
+[profile.release]
+strip = true
+lto = true
+codegen-units = 1
+
+[dev-dependencies]
+tiny_http = "0.12"
+
+[target."cfg(unix)".dependencies]
+libc = "0.2"
+
+[target."cfg(windows)".dependencies]
+windows-sys = { version = "0.61", features = ["Win32_System_Threading", "Win32_Foundation"] }

@@ -4,3 +4,4 @@
 bin/
 claude-divoom
 dist/
+/target
