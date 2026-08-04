@@ -192,6 +192,7 @@ dependencies = [
 [[package]]
 name = "divoomkit"
 version = "0.1.0"
+source = "git+https://github.com/ivan-moskvin/divoomkit?branch=main#153d2528ba4afb4f07a8de6e82cb80e420024a06"
 dependencies = [
  "gif",
  "if-addrs",

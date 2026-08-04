@@ -13,7 +13,7 @@ name = "claudestatus"
 path = "src/main.rs"
 
 [dependencies]
-divoomkit = { path = "../divoomkit" }
+divoomkit = { git = "https://github.com/ivan-moskvin/divoomkit", branch = "main" }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = { version = "1.0", features = ["preserve_order"] }
 ureq = { version = "3.3", features = ["json"] }
