@@ -32,6 +32,23 @@ pub fn install() -> Outcome {
     Ok(())
 }
 
+/// Whether the status line in the settings is ours. The wizard asks before
+/// offering to register it: an offer to do what is already done reads as if
+/// nothing had worked.
+pub fn registered() -> Result<bool, String> {
+    let exe = update::self_path()?;
+    let path = settings_path()?;
+    if !path.exists() {
+        return Ok(false);
+    }
+
+    Ok(read_settings(&path)?
+        .get("statusLine")
+        .and_then(|line| line.get("command"))
+        .and_then(Value::as_str)
+        .is_some_and(|command| command == quoted(&exe)))
+}
+
 /// Writes the command into `statusLine` of settings.json, backing the file up
 /// first. Answers with the status line it replaced, if there was one worth
 /// mentioning.

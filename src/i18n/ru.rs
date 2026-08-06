@@ -12,11 +12,12 @@ pub const CATALOG: &[(&str, &str)] = &[
 
 Usage:
   claudestatus            status line: session JSON on stdin, line on stdout
+  claudestatus setup      ask what to show and where — at any time, over what is set up
   claudestatus install    register in ~/.claude/settings.json
   claudestatus check      check whether a new version is out
   claudestatus update     download the latest version and replace itself
   claudestatus uninstall  remove the status line, the cache and the binary
-  claudestatus divoom     limits panel on a Divoom Times Gate (divoom help)
+  claudestatus divoom     the panels on a Divoom Times Gate (divoom help)
   claudestatus version    print the version
   claudestatus help       this help
 
@@ -28,11 +29,12 @@ Environment:
 
 Использование:
   claudestatus            строка статуса: JSON сессии на stdin, строка на stdout
+  claudestatus setup      спросить, что и где показывать — когда угодно, поверх настроенного
   claudestatus install    прописать себя в ~/.claude/settings.json
   claudestatus check      проверить, вышла ли новая версия
   claudestatus update     скачать последнюю версию и заменить себя ею
   claudestatus uninstall  убрать строку статуса, кэш и сам бинарь
-  claudestatus divoom     панель лимитов на Divoom Times Gate (divoom help)
+  claudestatus divoom     панели на Divoom Times Gate (divoom help)
   claudestatus version    показать версию
   claudestatus help       эта справка
 
@@ -168,29 +170,27 @@ Environment:
     ("{0} answered {1}", "{0} ответил {1}"),
     // divoom: help and arguments
     (
-        "claudestatus divoom — limits panel on the screen of a Divoom Times Gate.
+        "claudestatus divoom — the Claude panels on a Divoom Times Gate.
 
 Usage:
-  claudestatus divoom on [N]       find the Divoom devices and turn the panel on device N
-  claudestatus divoom off          turn the panel off and give the screen its clock face back
-  claudestatus divoom              keep the panel updated (works while running)
-  claudestatus divoom once         send the panel once and exit
-  claudestatus divoom screen [N]   show or take over screen 1–5
+  claudestatus divoom on           turn the panels back on
+  claudestatus divoom off          turn them off and give the screens their clock faces back
+  claudestatus divoom              keep the panels updated (works while running)
+  claudestatus divoom once         send every panel once and exit
   claudestatus divoom preview FILE save a frame to a file without touching the device
 
-The settings are divoom.json in the application directory, created by on.
+Which device and what goes on which screen is asked by claudestatus setup.
 ",
-        "claudestatus divoom — панель лимитов на экране Divoom Times Gate.
+        "claudestatus divoom — панели Claude на Divoom Times Gate.
 
 Использование:
-  claudestatus divoom on [N]       найти устройства Divoom и включить панель на устройстве N
-  claudestatus divoom off          выключить панель и вернуть экрану циферблат
-  claudestatus divoom              держать панель обновлённой (работает, пока запущен)
-  claudestatus divoom once         отправить панель один раз и выйти
-  claudestatus divoom screen [N]   показать или занять экран 1–5
+  claudestatus divoom on           включить панели обратно
+  claudestatus divoom off          выключить их и вернуть экранам циферблаты
+  claudestatus divoom              держать панели обновлёнными (работает, пока запущен)
+  claudestatus divoom once         отправить каждую панель один раз и выйти
   claudestatus divoom preview FILE сохранить кадр в файл, не трогая устройство
 
-Настройки — divoom.json в каталоге приложения, создаёт on.
+Какое устройство и что на каком экране — спрашивает claudestatus setup.
 ",
     ),
     (
@@ -202,43 +202,55 @@ The settings are divoom.json in the application directory, created by on.
         "неизвестная команда: {0}\n\n{1}",
     ),
     // divoom: device and bridge
-    ("Device {0}: {1}", "Устройство {0}: {1}"),
+    ("Device: {0} — {1}", "Устройство: {0} — {1}"),
     (
         "Divoom devices on the network:",
         "Устройства Divoom в сети:",
     ),
     ("Divoom device", "устройство Divoom"),
     (
-        "Which one gets the panel? 1–{0}: ",
-        "На какое повесить панель? 1–{0}: ",
+        "Which one gets the panels? 1–{0}: ",
+        "На какое повесить панели? 1–{0}: ",
     ),
     (
         "the device is a number from 1 to {0}, not {1}",
         "устройство — число от 1 до {0}, а не {1}",
     ),
     (
-        "there is more than one device — name the number: claudestatus divoom on N",
-        "устройств больше одного — укажите номер: claudestatus divoom on N",
+        "there is more than one device and nobody to ask",
+        "устройств больше одного, а спросить некого",
     ),
     (
-        "the chosen device is not on the network — choose again: claudestatus divoom on",
-        "выбранного устройства нет в сети — выберите заново: claudestatus divoom on",
+        "the chosen device is not on the network — choose again: claudestatus setup",
+        "выбранного устройства нет в сети — выберите заново: claudestatus setup",
     ),
     (
         "the device did not take the frame",
         "устройство не забрало кадр",
     ),
     (
-        "Panel on screen {0} of device {1}, updated every {2}",
-        "Панель на экране {0} устройства {1}, обновление каждые {2}",
+        "Panels on device {0}, updated every {1}: {2}",
+        "Панели на устройстве {0}, обновление каждые {1}: {2}",
     ),
     (
         "the device has been unreachable for too long, leaving",
         "устройство недоступно слишком долго, выхожу",
     ),
     (
-        "the panel is not turned on — claudestatus divoom on",
-        "панель не включена — claudestatus divoom on",
+        "the panel is not turned on — claudestatus setup",
+        "панели не включены — claudestatus setup",
+    ),
+    (
+        "no screen has a panel on it — claudestatus setup",
+        "ни на одном экране нет панели — claudestatus setup",
+    ),
+    (
+        "nothing is set up yet — claudestatus setup",
+        "ничего ещё не настроено — claudestatus setup",
+    ),
+    (
+        "no device was ever chosen — claudestatus setup",
+        "устройство ни разу не выбирали — claudestatus setup",
     ),
     ("{0} does not parse: {1}", "{0} не разбирается: {1}"),
     (
@@ -263,29 +275,10 @@ The settings are divoom.json in the application directory, created by on.
     ),
     ("the bridge is already running", "мост уже запущен"),
     ("The Divoom bridge is stopped", "Остановлен мост Divoom"),
+    ("The panels are on: {0}", "Панели включены: {0}"),
     (
-        "The panel is on screen {0} of {1}",
-        "Панель на экране {0} из {1}",
-    ),
-    (
-        "the screen is a number from 1 to {0}, not {1}",
-        "экран — число от 1 до {0}, а не {1}",
-    ),
-    (
-        "The panel is on screen {0} already",
-        "Панель и так на экране {0}",
-    ),
-    (
-        "The panel moved to screen {0}",
-        "Панель переехала на экран {0}",
-    ),
-    (
-        "The panel is on, screen {0}",
-        "Панель включена на экране {0}",
-    ),
-    (
-        "The panel is off, the screen got its clock face back",
-        "Панель выключена, экрану возвращён его циферблат",
+        "The panels are off, the screens got their clock faces back",
+        "Панели выключены, экранам возвращены их циферблаты",
     ),
     ("no snapshot found", "снапшот не найден"),
     ("the snapshot is damaged", "снапшот повреждён"),
@@ -294,9 +287,94 @@ The settings are divoom.json in the application directory, created by on.
         "could not draw the panel: {0}",
         "не удалось нарисовать панель: {0}",
     ),
+    // setup: the wizard
+    (
+        "claudestatus setup — run it again whenever you like.",
+        "claudestatus setup — запускайте когда угодно, хоть поверх настроенного.",
+    ),
+    (
+        "Enter keeps what is there now.\n",
+        "Enter оставляет как есть.\n",
+    ),
+    (
+        "setup asks questions and needs a terminal",
+        "setup задаёт вопросы, ему нужен терминал",
+    ),
+    (
+        "The status line is registered with Claude Code.",
+        "Строка статуса прописана в Claude Code.",
+    ),
+    (
+        "Register the status line in Claude Code?",
+        "Прописать строку статуса в Claude Code?",
+    ),
+    (
+        "Show the panels on a Divoom Times Gate?",
+        "Показывать панели на Divoom Times Gate?",
+    ),
+    ("The panels go to {0} ({1}).", "Панели уходят на {0} ({1})."),
+    ("Look for the device again?", "Искать устройство заново?"),
+    ("Looking for Divoom devices…", "Ищу устройства Divoom…"),
+    (
+        "No Divoom devices are visible on this network.",
+        "Устройств Divoom в этой сети не видно.",
+    ),
+    ("\nWhat goes on which screen:", "\nЧто на каком экране:"),
+    (
+        "nothing — leave the screen alone",
+        "ничего — не трогать экран",
+    ),
+    ("nothing", "ничего"),
+    ("Screen {0} [{1}]: ", "Экран {0} [{1}]: "),
+    ("Screen {0}:", "Экран {0}:"),
+    (
+        "A number from 0 to {0}, please.",
+        "Нужно число от 0 до {0}.",
+    ),
+    (
+        "No screen has a panel on it.",
+        "Ни на одном экране нет панели.",
+    ),
+    (
+        "\nNothing reports the billing date — Claude Code gives out the rolling windows only.",
+        "\nДату списания никто не сообщает — Claude Code отдаёт только скользящие окна.",
+    ),
+    (
+        "Which day of the month is the subscription charged on? 1–31 [{0}]: ",
+        "Какого числа списывается подписка? 1–31 [{0}]: ",
+    ),
+    ("not set", "не задано"),
+    (
+        "Without it the screen would have nothing to count.",
+        "Без него экрану нечего считать.",
+    ),
+    ("A number from 1 to 31, please.", "Нужно число от 1 до 31."),
+    ("\nSaved.", "\nСохранено."),
+    (
+        "\nSaved. No panels are running.",
+        "\nСохранено. Ни одна панель не запущена.",
+    ),
+    (
+        "Screen {0} is waiting for the billing day — run setup again to give it one.",
+        "Экран {0} ждёт дня списания — запустите setup ещё раз и задайте его.",
+    ),
+    ("Yes or no, please.", "Нужно да или нет."),
+    ("[Y/n] ", "[Д/н] "),
+    ("[y/N] ", "[д/Н] "),
+    // setup: what a panel is called
+    ("limits: 5h, reset, week", "лимиты: 5ч, сброс, неделя"),
+    ("the five-hour window", "пятичасовое окно"),
+    ("the weekly window", "недельное окно"),
+    (
+        "days until the subscription renews",
+        "дни до продления подписки",
+    ),
     // divoom: labels drawn on the panel itself. Every character here must have a
     // glyph in the font of divoomkit, and the string has to fit its bar.
     ("RESET", "СБРОС"),
     ("NO", "НЕТ"),
     ("DATA", "ДАННЫХ"),
+    ("DATE", "ДАТЫ"),
+    ("RENEWS", "ПРОДЛЕНИЕ"),
+    ("TODAY", "СЕГОДНЯ"),
 ];

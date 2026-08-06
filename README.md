@@ -46,10 +46,11 @@ Removes the status line from the settings, the cache, the Divoom panel and the b
 
 ```
 claudestatus            status line: session JSON on stdin, line on stdout
+claudestatus setup      ask what to show and where
 claudestatus check      check whether a new version is out
 claudestatus update     download the latest version and replace itself with it
 claudestatus uninstall  remove the status line, the cache and the binary
-claudestatus divoom     show the limits on a Divoom Times Gate screen
+claudestatus divoom     show the panels on a Divoom Times Gate
 claudestatus version    print the version
 ```
 
@@ -62,24 +63,32 @@ orange up to 85%, red above.
 
 ## Divoom Times Gate
 
-The same limits — on the screen of a [Divoom Times Gate](https://divoom.com/products/time-gate).
+The same limits — on the screens of a [Divoom Times Gate](https://divoom.com/products/time-gate).
 
 ![The limits panel on a Divoom Times Gate](divoom.webp)
 
 ```bash
-claudestatus divoom on
+claudestatus setup
 ```
 
-Finds the device on the network and turns the panel on. From there it updates
-itself while a session is running. It takes the fifth screen, which can be
-changed to any other: `claudestatus divoom screen 3`.
+Asks which device gets the panels and what goes on each of its five screens:
+
+- `limits` — the five-hour window, the time until it resets, the week;
+- `5h` and `7d` — one window each, large enough to read across a room;
+- `renewal` — the days until the subscription renews.
+
+The screens not chosen are left to whoever owns them. Run `setup` again at any
+time, over a setup that is already running: Enter keeps what is there now.
+
+Nothing reports the day the subscription is charged on — Claude Code gives out
+the rolling windows only — so `renewal` asks for it once and counts from the
+calendar.
 
 ```
-claudestatus divoom on [N]       find the devices and turn the panel on device N
-claudestatus divoom off          turn the panel off and give the screen its clock face back
-claudestatus divoom              keep the panel updated (works while running)
-claudestatus divoom once         send the panel once and exit
-claudestatus divoom screen [N]   show or take over screen 1–5
+claudestatus divoom on           turn the panels back on
+claudestatus divoom off          turn them off and give the screens their clock faces back
+claudestatus divoom              keep the panels updated (works while running)
+claudestatus divoom once         send every panel once and exit
 claudestatus divoom preview FILE save a frame to a file without touching the device
 ```
 
