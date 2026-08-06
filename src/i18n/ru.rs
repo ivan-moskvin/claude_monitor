@@ -203,23 +203,7 @@ Which device and what goes on which screen is asked by claudestatus setup.
     ),
     // divoom: device and bridge
     ("Device: {0} — {1}", "Устройство: {0} — {1}"),
-    (
-        "Divoom devices on the network:",
-        "Устройства Divoom в сети:",
-    ),
     ("Divoom device", "устройство Divoom"),
-    (
-        "Which one gets the panels? 1–{0}: ",
-        "На какое повесить панели? 1–{0}: ",
-    ),
-    (
-        "the device is a number from 1 to {0}, not {1}",
-        "устройство — число от 1 до {0}, а не {1}",
-    ),
-    (
-        "there is more than one device and nobody to ask",
-        "устройств больше одного, а спросить некого",
-    ),
     (
         "the chosen device is not on the network — choose again: claudestatus setup",
         "выбранного устройства нет в сети — выберите заново: claudestatus setup",
@@ -289,13 +273,24 @@ Which device and what goes on which screen is asked by claudestatus setup.
     ),
     // setup: the wizard
     (
-        "claudestatus setup — run it again whenever you like.",
-        "claudestatus setup — запускайте когда угодно, хоть поверх настроенного.",
+        "claudestatus setup — run it again whenever you like.\n",
+        "claudestatus setup — запускайте когда угодно, хоть поверх настроенного.\n",
     ),
+    // menu: the keys, and the two answers every yes-or-no question has
+    ("↑↓ choose   Enter confirm", "↑↓ выбор   Enter подтвердить"),
     (
-        "Enter keeps what is there now.\n",
-        "Enter оставляет как есть.\n",
+        "number, or Enter to keep: ",
+        "номер, или Enter чтобы оставить: ",
     ),
+    ("yes", "да"),
+    ("no", "нет"),
+    ("Which one gets the panels?", "На какое повесить панели?"),
+    ("nothing was chosen", "ничего не выбрано"),
+    (
+        "setup was cancelled, nothing changed",
+        "setup прерван, ничего не изменилось",
+    ),
+    ("Screen {0}", "Экран {0}"),
     (
         "setup asks questions and needs a terminal",
         "setup задаёт вопросы, ему нужен терминал",
@@ -325,12 +320,7 @@ Which device and what goes on which screen is asked by claudestatus setup.
         "ничего — не трогать экран",
     ),
     ("nothing", "ничего"),
-    ("Screen {0} [{1}]: ", "Экран {0} [{1}]: "),
     ("Screen {0}:", "Экран {0}:"),
-    (
-        "A number from 0 to {0}, please.",
-        "Нужно число от 0 до {0}.",
-    ),
     (
         "No screen has a panel on it.",
         "Ни на одном экране нет панели.",
@@ -358,9 +348,6 @@ Which device and what goes on which screen is asked by claudestatus setup.
         "Screen {0} is waiting for the billing day — run setup again to give it one.",
         "Экран {0} ждёт дня списания — запустите setup ещё раз и задайте его.",
     ),
-    ("Yes or no, please.", "Нужно да или нет."),
-    ("[Y/n] ", "[Д/н] "),
-    ("[y/N] ", "[д/Н] "),
     // setup: what a panel is called
     ("limits: 5h, reset, week", "лимиты: 5ч, сброс, неделя"),
     ("the five-hour window", "пятичасовое окно"),

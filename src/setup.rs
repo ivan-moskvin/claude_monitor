@@ -1,9 +1,13 @@
 //! The wizard: everything that has to be decided once, asked in one place.
 //!
 //! It is not an onboarding step but the settings themselves — it may be run at
-//! any time, over a setup that is already working, and it says what is there
-//! now rather than starting from the defaults. Answering nothing keeps what was
-//! there, so walking through it changes nothing by itself.
+//! any time, over a setup that is already working, and it starts every question
+//! on the answer that is in force now. Walking through it with Enter changes
+//! nothing.
+//!
+//! Nothing is typed: the questions are lists and the arrow keys move through
+//! them. The one exception is the day of the charge, which is a number and is
+//! quicker typed than scrolled to.
 //!
 //! Applying the answers is the delicate part: the bridge holds the screens, so
 //! it is stopped, the screens that are being given up get their clock faces
@@ -16,7 +20,7 @@ use divoomkit::{Discover, discover};
 use crate::i18n::{t, tf};
 use crate::panel::config::{Config, Missing, Panel, Screen};
 use crate::panel::{self, daemon};
-use crate::{Outcome, install};
+use crate::{Outcome, install, menu};
 
 pub fn run() -> Outcome {
     if !std::io::stdin().is_terminal() {
@@ -32,9 +36,8 @@ pub fn run() -> Outcome {
 
     println!(
         "{}",
-        t("claudestatus setup — run it again whenever you like.")
+        t("claudestatus setup — run it again whenever you like.\n")
     );
-    println!("{}", t("Enter keeps what is there now.\n"));
 
     status_line()?;
 
@@ -53,7 +56,7 @@ fn status_line() -> Outcome {
         println!("{}", t("The status line is registered with Claude Code."));
         return Ok(());
     }
-    if !ask_yes(t("Register the status line in Claude Code?"), true)? {
+    if !menu::confirm(t("Register the status line in Claude Code?"), true)? {
         return Ok(());
     }
     install::install()
@@ -68,10 +71,10 @@ fn device(config: &mut Config) -> Result<bool, String> {
             "{}",
             tf!("The panels go to {0} ({1}).", config.name, config.ip)
         );
-        if !ask_yes(t("Look for the device again?"), false)? {
+        if !menu::confirm(t("Look for the device again?"), false)? {
             return Ok(true);
         }
-    } else if !ask_yes(t("Show the panels on a Divoom Times Gate?"), true)? {
+    } else if !menu::confirm(t("Show the panels on a Divoom Times Gate?"), true)? {
         return Ok(false);
     }
 
@@ -86,7 +89,7 @@ fn device(config: &mut Config) -> Result<bool, String> {
         }
     };
 
-    let picked = panel::choose_device(&found, config)?;
+    let picked = choose_device(&found, config)?;
     println!(
         "{}",
         tf!("Device: {0} — {1}", panel::label(&picked), picked.ip())
@@ -95,18 +98,60 @@ fn device(config: &mut Config) -> Result<bool, String> {
     Ok(true)
 }
 
-/// What goes on each of the five screens.
-fn screens(config: &mut Config) -> Outcome {
-    println!("{}", t("\nWhat goes on which screen:"));
-    for (number, panel) in Panel::ALL.iter().enumerate() {
-        println!("  {}. {}", number + 1, panel.title());
+/// One device needs no choosing; several are a list like every other question.
+fn choose_device(
+    found: &[divoomkit::Device],
+    config: &Config,
+) -> Result<divoomkit::Device, String> {
+    if found.len() == 1 {
+        return Ok(found[0].clone());
     }
-    println!("  0. {}", t("nothing — leave the screen alone"));
+    let known = panel::pick_known(found, config);
+    let at = known
+        .as_ref()
+        .and_then(|known| found.iter().position(|device| device.ip() == known.ip()))
+        .unwrap_or(0);
+
+    let items: Vec<String> = found
+        .iter()
+        .map(|device| format!("{} — {}", panel::label(device), device.ip()))
+        .collect();
+
+    match menu::select(t("Which one gets the panels?"), &items, at)? {
+        Some(picked) => Ok(found[picked].clone()),
+        None => Err(t("nothing was chosen").into()),
+    }
+}
+
+/// What goes on each of the five screens, one screen at a time.
+fn screens(config: &mut Config) -> Outcome {
+    // "nothing" first: the answer for a screen the wizard must not touch is the
+    // one most screens need, and it starts the list.
+    let mut items = vec![t("nothing — leave the screen alone").to_string()];
+    items.extend(Panel::ALL.iter().map(|panel| panel.title().to_string()));
+
+    println!("{}", t("\nWhat goes on which screen:"));
 
     for index in 0..divoomkit::SCREEN_COUNT {
         let current = config.screen(index).map(|screen| screen.panel);
-        let answer = ask_panel(index, current)?;
-        config.set_screen(index, answer);
+        let at = match current {
+            None => 0,
+            Some(panel) => {
+                Panel::ALL
+                    .iter()
+                    .position(|known| *known == panel)
+                    .unwrap_or(0)
+                    + 1
+            }
+        };
+
+        let title = tf!("Screen {0}", index + 1);
+        let Some(picked) = menu::select(&title, &items, at)? else {
+            // Cancelled: what was answered so far is not written down, and the
+            // panels keep running as they were.
+            return Err(t("setup was cancelled, nothing changed").into());
+        };
+        config.set_screen(index, (picked > 0).then(|| Panel::ALL[picked - 1]));
     }
 
     if config.screens.is_empty() {
@@ -115,31 +160,9 @@ fn screens(config: &mut Config) -> Outcome {
     Ok(())
 }
 
-fn ask_panel(index: u8, current: Option<Panel>) -> Result<Option<Panel>, String> {
-    let shown = match current {
-        Some(panel) => panel.title().to_string(),
-        None => t("nothing").to_string(),
-    };
-    let question = tf!("Screen {0} [{1}]: ", index + 1, shown);
-
-    loop {
-        let answer = ask(&question)?;
-        if answer.is_empty() {
-            return Ok(current);
-        }
-        match answer.parse::<usize>() {
-            Ok(0) => return Ok(None),
-            Ok(number) if number <= Panel::ALL.len() => return Ok(Some(Panel::ALL[number - 1])),
-            _ => println!(
-                "{}",
-                tf!("A number from 0 to {0}, please.", Panel::ALL.len())
-            ),
-        }
-    }
-}
-
 /// The day of the charge — asked only when a screen is going to show it, and
-/// only when we do not know it yet.
+/// only when we do not know it yet. A number is typed: scrolling to the 27th of
+/// a list of thirty-one is worse than pressing two keys.
 fn billing_day(config: &mut Config) -> Outcome {
     let wanted = config
         .screens
@@ -159,10 +182,21 @@ fn billing_day(config: &mut Config) -> Outcome {
     );
 
     loop {
-        let answer = ask(&tf!(
-            "Which day of the month is the subscription charged on? 1–31 [{0}]: ",
-            shown
-        ))?;
+        print!(
+            "{}",
+            tf!(
+                "Which day of the month is the subscription charged on? 1–31 [{0}]: ",
+                shown
+            )
+        );
+        let _ = std::io::stdout().flush();
+
+        let mut answer = String::new();
+        std::io::stdin()
+            .read_line(&mut answer)
+            .map_err(|err| err.to_string())?;
+        let answer = answer.trim();
+
         if answer.is_empty() {
             if config.billing_day.is_some() {
                 return Ok(());
@@ -185,8 +219,7 @@ fn billing_day(config: &mut Config) -> Outcome {
 
 /// Writes the answers down and moves the panels to where they now belong.
 fn apply(mut config: Config, before: &[Screen]) -> Outcome {
-    let was_running = daemon::running();
-    if was_running {
+    if daemon::running() {
         // The bridge holds the screens and gives them back on its way out;
         // stopping it first is what makes a screen safe to hand over.
         daemon::stop();
@@ -204,8 +237,6 @@ fn apply(mut config: Config, before: &[Screen]) -> Outcome {
         daemon::restore_screens(&config, &dropped);
     }
 
-    // A screen that changed hands from one panel to another keeps its clock
-    // face; one that is new to us has none yet, and the bridge asks the cloud.
     config.on = Some(!config.screens.is_empty() && !config.ip.is_empty());
     config.save()?;
 
@@ -237,32 +268,4 @@ fn apply(mut config: Config, before: &[Screen]) -> Outcome {
         }
     }
     Ok(())
-}
-
-fn ask(question: &str) -> Result<String, String> {
-    print!("{question}");
-    let _ = std::io::stdout().flush();
-
-    let mut answer = String::new();
-    std::io::stdin()
-        .read_line(&mut answer)
-        .map_err(|err| err.to_string())?;
-    Ok(answer.trim().to_string())
-}
-
-fn ask_yes(question: &str, default: bool) -> Result<bool, String> {
-    let hint = if default { t("[Y/n] ") } else { t("[y/N] ") };
-    loop {
-        let answer = ask(&format!("{question} {hint}"))?.to_lowercase();
-        if answer.is_empty() {
-            return Ok(default);
-        }
-        // The first letter is enough, and it is the letter of the language the
-        // question was asked in.
-        match answer.chars().next() {
-            Some('y' | 'д') => return Ok(true),
-            Some('n' | 'н') => return Ok(false),
-            _ => println!("{}", t("Yes or no, please.")),
-        }
-    }
 }

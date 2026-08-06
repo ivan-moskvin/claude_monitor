@@ -17,7 +17,6 @@ pub mod daemon;
 mod render;
 pub mod usage;
 
-use std::io::Write;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use divoomkit::{Bridge, ClockFace, Device, Discover, Error, Pacing, Tick, discover};
@@ -416,51 +415,6 @@ fn turn_off() -> Outcome {
         t("The panels are off, the screens got their clock faces back")
     );
     Ok(())
-}
-
-/// Asks the human which device gets the panels. Used by the wizard, which is
-/// the only place a person is at the keyboard.
-pub fn choose_device(found: &[Device], config: &Config) -> Result<Device, String> {
-    if found.len() == 1 {
-        return Ok(found[0].clone());
-    }
-    if let Some(known) = pick_known(found, config) {
-        return Ok(known);
-    }
-
-    list(found);
-    if !std::io::IsTerminal::is_terminal(&std::io::stdin()) {
-        return Err(t("there is more than one device and nobody to ask").into());
-    }
-
-    print!("{}", tf!("Which one gets the panels? 1–{0}: ", found.len()));
-    let _ = std::io::stdout().flush();
-
-    let mut answer = String::new();
-    std::io::stdin()
-        .read_line(&mut answer)
-        .map_err(|err| err.to_string())?;
-    let answer = answer.trim();
-
-    by_number(found, answer).ok_or_else(|| {
-        tf!(
-            "the device is a number from 1 to {0}, not {1}",
-            found.len(),
-            format!("{answer:?}")
-        )
-    })
-}
-
-fn by_number(found: &[Device], asked: &str) -> Option<Device> {
-    let number: usize = asked.parse().ok()?;
-    (number >= 1 && number <= found.len()).then(|| found[number - 1].clone())
-}
-
-fn list(found: &[Device]) {
-    println!("{}", t("Divoom devices on the network:"));
-    for (index, device) in found.iter().enumerate() {
-        println!("  {}. {} — {}", index + 1, label(device), device.ip());
-    }
 }
 
 pub fn label(device: &Device) -> String {

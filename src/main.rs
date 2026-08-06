@@ -8,6 +8,7 @@
 mod civil;
 mod i18n;
 mod install;
+mod menu;
 mod panel;
 mod paths;
 mod setup;
