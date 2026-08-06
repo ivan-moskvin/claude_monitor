@@ -5,10 +5,13 @@
 //! exist for the human only: register in the settings, check for an update and
 //! install it.
 
+mod civil;
 mod i18n;
 mod install;
+mod menu;
 mod panel;
 mod paths;
+mod setup;
 mod snapshot;
 mod statusline;
 mod update;
@@ -24,11 +27,12 @@ const USAGE: &str = "claudestatus — Claude limits in the Claude Code status li
 
 Usage:
   claudestatus            status line: session JSON on stdin, line on stdout
+  claudestatus setup      ask what to show and where — at any time, over what is set up
   claudestatus install    register in ~/.claude/settings.json
   claudestatus check      check whether a new version is out
   claudestatus update     download the latest version and replace itself
   claudestatus uninstall  remove the status line, the cache and the binary
-  claudestatus divoom     limits panel on a Divoom Times Gate (divoom help)
+  claudestatus divoom     the panels on a Divoom Times Gate (divoom help)
   claudestatus version    print the version
   claudestatus help       this help
 
@@ -53,6 +57,7 @@ fn main() {
 
     // --install is still understood: old install scripts spell it that way.
     let result: Outcome = match command.as_str() {
+        "setup" => setup::run(),
         "install" | "--install" => install::install(),
         "uninstall" => install::uninstall(),
         "divoom" => panel::run(&args[1..]),

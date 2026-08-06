@@ -7,6 +7,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use divoomkit::Rgb;
 use serde::Deserialize;
 
+use crate::civil::days_from_civil;
 use crate::i18n::t;
 use crate::paths;
 use crate::snapshot::NAME;
@@ -220,15 +221,13 @@ fn parse_rfc3339(stamp: &str) -> Option<f64> {
     )
 }
 
-/// A calendar date to days since the epoch, by Howard Hinnant's days_from_civil.
-fn days_from_civil(year: i64, month: i64, day: i64) -> i64 {
-    let year = if month <= 2 { year - 1 } else { year };
-    let era = year.div_euclid(400);
-    let year_of_era = year - era * 400;
-    let shifted = if month > 2 { month - 3 } else { month + 9 };
-    let day_of_year = (153 * shifted + 2) / 5 + day - 1;
-    let day_of_era = year_of_era * 365 + year_of_era / 4 - year_of_era / 100 + day_of_year;
-    era * 146_097 + day_of_era - 719_468
+/// A snapshot there were no numbers to read, for the tests of whoever draws it.
+#[cfg(test)]
+pub fn trouble_for_test() -> Snapshot {
+    Snapshot {
+        trouble: Some("no snapshot found".into()),
+        ..Default::default()
+    }
 }
 
 /// A snapshot with numbers in it, for the tests of whoever draws them.

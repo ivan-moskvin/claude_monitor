@@ -1,28 +1,30 @@
-//! Drawing the panel. What the device does with the picture is the business of
+//! Drawing the panels. What the device does with the picture is the business of
 //! divoomkit; what goes on the picture is ours.
+//!
+//! One screen, one panel: [`draw`] is handed what the screen was given in the
+//! config and picks the drawing accordingly.
+
+mod limits;
+mod renewal;
 
 use std::time::Duration;
 
 use divoomkit::{BarStyle, Canvas, Frame, Rgb, Size};
 
 use crate::i18n::{t, tf};
-use crate::panel::usage::{FIVE_HOUR_SECONDS, SEVEN_DAY_SECONDS, Snapshot, Window};
+use crate::panel::config::Panel;
+use crate::panel::usage::Snapshot;
 
 /// The color of the Claude sparkle in the header.
 const CLAUDE: Rgb = Rgb(0xd9, 0x77, 0x57);
 
-/// The header with the sparkle on top, three bars with their labels below it.
+/// The header with the sparkle on top, the rows below it.
 const LABEL_X: i32 = 6;
 const LABEL_WIDE: i32 = 22;
 const BAR_X: i32 = 32;
 const BAR_WIDTH: u32 = 128 - BAR_X as u32 - LABEL_X as u32;
 const BAR_HEIGHT: u32 = 20;
 const ROW_GAP: i32 = 7;
-/// The week row is split in two: the usage above, the week running out below,
-/// together taking the height of an ordinary row.
-const WEEK_BAR_HEIGHT: u32 = 14;
-const WEEK_GAP: i32 = 2;
-const WEEK_ELAPSED_HEIGHT: u32 = BAR_HEIGHT - WEEK_BAR_HEIGHT - WEEK_GAP as u32;
 const HEADER_Y: i32 = 8;
 const SPARK_SIZE: i32 = 17;
 const FIRST_ROW_Y: i32 = 38;
@@ -30,10 +32,45 @@ const RESET_ICON: i32 = 15;
 
 const GLYPH_HEIGHT: i32 = 7;
 
-pub fn draw(state: &Snapshot) -> Result<Frame, String> {
-    let mut canvas = Canvas::new(Size::Px128);
+/// Everything a panel is drawn from. The billing cycle is only known once the
+/// user has told us the day of the charge.
+pub struct State<'a> {
+    pub usage: &'a Snapshot,
+    pub cycle: Option<crate::panel::billing::Cycle>,
+}
 
-    sparkle(&mut canvas, LABEL_X, HEADER_Y, SPARK_SIZE, CLAUDE);
+pub fn draw(panel: Panel, state: &State) -> Result<Frame, String> {
+    let mut canvas = Canvas::new(Size::Px128);
+    header(&mut canvas, state.usage);
+
+    // A panel drawn from the snapshot has nothing to say without one; the
+    // renewal panel is counted from the calendar and does not care.
+    if state.usage.trouble.is_some() && panel != Panel::Renewal {
+        canvas.text_centered(52, 3, Rgb::GREY, t("NO"));
+        canvas.text_centered(86, 2, Rgb::GREY, t("DATA"));
+        return finish(canvas);
+    }
+
+    match panel {
+        Panel::Limits => limits::draw(&mut canvas, state.usage),
+        Panel::FiveHour => limits::draw_one(&mut canvas, state.usage, "five_hour", "5H"),
+        Panel::Week => limits::draw_one(&mut canvas, state.usage, "seven_day", "7D"),
+        Panel::Renewal => renewal::draw(&mut canvas, state.cycle),
+    }
+    finish(canvas)
+}
+
+fn finish(canvas: Canvas) -> Result<Frame, String> {
+    canvas
+        .finish()
+        .map_err(|err| tf!("could not draw the panel: {0}", err))
+}
+
+/// The sparkle, the word, and how old the numbers are. The same on every panel:
+/// the screens hang side by side and a header that moved would read as a
+/// different device.
+fn header(canvas: &mut Canvas, state: &Snapshot) {
+    sparkle(canvas, LABEL_X, HEADER_Y, SPARK_SIZE, CLAUDE);
     canvas.text(
         LABEL_X + SPARK_SIZE + 7,
         HEADER_Y + (SPARK_SIZE - GLYPH_HEIGHT * 2) / 2,
@@ -57,99 +94,6 @@ pub fn draw(state: &Snapshot) -> Result<Frame, String> {
             &label,
         );
     }
-
-    if state.trouble.is_some() {
-        canvas.text_centered(52, 3, Rgb::GREY, t("NO"));
-        canvas.text_centered(86, 2, Rgb::GREY, t("DATA"));
-        return canvas
-            .finish()
-            .map_err(|err| tf!("could not draw the panel: {0}", err));
-    }
-
-    let (five, week) = (state.window("five_hour"), state.window("seven_day"));
-
-    let mut y = FIRST_ROW_Y;
-    canvas.text(
-        LABEL_X,
-        y + (BAR_HEIGHT as i32 - GLYPH_HEIGHT * 2) / 2,
-        2,
-        Rgb::GREY,
-        "5H",
-    );
-    bar(
-        &mut canvas,
-        y,
-        BAR_HEIGHT,
-        five.fraction(),
-        five.tint(),
-        &five.percent_label(),
-    );
-
-    y += BAR_HEIGHT as i32 + ROW_GAP;
-    reset_icon(
-        &mut canvas,
-        LABEL_X + (LABEL_WIDE - RESET_ICON) / 2,
-        y + (BAR_HEIGHT as i32 - RESET_ICON) / 2,
-        RESET_ICON,
-        Rgb::GREY,
-    );
-    bar(
-        &mut canvas,
-        y,
-        BAR_HEIGHT,
-        five.elapsed_fraction(FIVE_HOUR_SECONDS),
-        reset_tint(five),
-        &reset_label(five),
-    );
-
-    y += BAR_HEIGHT as i32 + ROW_GAP;
-    canvas.text(
-        LABEL_X,
-        y + (BAR_HEIGHT as i32 - GLYPH_HEIGHT * 2) / 2,
-        2,
-        Rgb::GREY,
-        "7D",
-    );
-    // The grey strip below the week is the week itself running out. Usage ahead
-    // of it is spent faster than the window gives it back; behind it there is
-    // room to spare. Without a resets_at there is no such strip to draw, and the
-    // usage takes the whole row.
-    if week.timed() {
-        bar(
-            &mut canvas,
-            y,
-            WEEK_BAR_HEIGHT,
-            week.fraction(),
-            week.tint(),
-            &week.percent_label(),
-        );
-        canvas.bar(
-            (
-                BAR_X,
-                y + (WEEK_BAR_HEIGHT as i32) + WEEK_GAP,
-                BAR_WIDTH,
-                WEEK_ELAPSED_HEIGHT,
-            ),
-            week.elapsed_fraction(SEVEN_DAY_SECONDS),
-            BarStyle {
-                fill: Rgb::GREY,
-                ..Default::default()
-            },
-        );
-    } else {
-        bar(
-            &mut canvas,
-            y,
-            BAR_HEIGHT,
-            week.fraction(),
-            week.tint(),
-            &week.percent_label(),
-        );
-    }
-
-    canvas
-        .finish()
-        .map_err(|err| tf!("could not draw the panel: {0}", err))
 }
 
 fn bar(canvas: &mut Canvas, y: i32, height: u32, fraction: f32, fill: Rgb, label: &str) {
@@ -171,15 +115,15 @@ fn bar(canvas: &mut Canvas, y: i32, height: u32, fraction: f32, fill: Rgb, label
     );
 }
 
-fn reset_label(five: Window) -> String {
-    if five.expired {
-        return t("RESET").into();
-    }
-    countdown_label(five.seconds_left)
-}
-
-fn reset_tint(five: Window) -> Rgb {
-    if five.expired { Rgb::GREY } else { Rgb::CYAN }
+/// The label of a row, in the column to the left of the bars.
+fn row_label(canvas: &mut Canvas, y: i32, height: u32, text: &str) {
+    canvas.text(
+        LABEL_X,
+        y + (height as i32 - GLYPH_HEIGHT * 2) / 2,
+        2,
+        Rgb::GREY,
+        text,
+    );
 }
 
 fn age_label(age: Duration) -> String {
@@ -258,6 +202,12 @@ fn reset_icon(canvas: &mut Canvas, x: i32, y: i32, size: i32, color: Rgb) {
 mod tests {
     use super::*;
     use crate::i18n::{LANGS, translate};
+    use crate::panel::billing;
+    use crate::panel::usage;
+
+    fn state(usage: &Snapshot) -> State<'_> {
+        State { usage, cycle: None }
+    }
 
     #[test]
     fn spells_the_countdown_in_digits() {
@@ -278,7 +228,7 @@ mod tests {
         // An unknown character is drawn as "?" — a panel of question marks is
         // worse than an untranslated word.
         for lang in LANGS {
-            for label in ["RESET", "NO", "DATA"] {
+            for label in ["RESET", "NO", "DATA", "DATE", "RENEWS", "TODAY"] {
                 let drawn = translate(*lang, label);
                 assert!(
                     divoomkit::font::covers(drawn),
@@ -301,38 +251,60 @@ mod tests {
 
     #[test]
     fn draws_a_panel_of_the_size_the_device_takes() {
-        let frame = draw(&Snapshot::default()).unwrap();
-        assert_eq!(&frame.bytes()[..6], b"GIF89a");
-        // 128 pixels, little-endian, right after the header.
-        assert_eq!(&frame.bytes()[6..10], &[128, 0, 128, 0]);
+        for panel in Panel::ALL {
+            let frame = draw(*panel, &state(&Snapshot::default())).unwrap();
+            assert_eq!(&frame.bytes()[..6], b"GIF89a");
+            // 128 pixels, little-endian, right after the header.
+            assert_eq!(&frame.bytes()[6..10], &[128, 0, 128, 0], "{panel:?}");
+        }
     }
 
     #[test]
     fn draws_something_else_when_there_are_no_numbers() {
-        let empty = draw(&Snapshot::default()).unwrap();
-        let with_numbers = draw(&crate::panel::usage::for_test(42.0, 9000, 400_000)).unwrap();
+        let empty = draw(Panel::Limits, &state(&Snapshot::default())).unwrap();
+        let numbers = usage::for_test(42.0, 9000, 400_000);
+        let with_numbers = draw(Panel::Limits, &state(&numbers)).unwrap();
         assert_ne!(empty.hash(), with_numbers.hash());
     }
 
     #[test]
-    fn shows_how_much_of_the_week_has_passed() {
-        let day = 24 * 3600;
-        let early = draw(&crate::panel::usage::for_test(42.0, 9000, 6 * day)).unwrap();
-        let late = draw(&crate::panel::usage::for_test(42.0, 9000, day)).unwrap();
-        assert_ne!(
-            early.hash(),
-            late.hash(),
-            "the same usage at a different point of the week"
-        );
+    fn tells_the_panels_apart() {
+        let numbers = usage::for_test(42.0, 9000, 400_000);
+        let mut drawn: Vec<String> = Panel::ALL
+            .iter()
+            .map(|panel| {
+                draw(
+                    *panel,
+                    &State {
+                        usage: &numbers,
+                        cycle: Some(billing::cycle(20, 1_786_000_000.0)),
+                    },
+                )
+                .unwrap()
+                .hash()
+                .to_string()
+            })
+            .collect();
+        let count = drawn.len();
+        drawn.sort();
+        drawn.dedup();
+        assert_eq!(count, drawn.len(), "two panels draw the same picture");
     }
 
     #[test]
-    fn the_week_row_stays_within_its_row() {
-        assert_eq!(
-            WEEK_BAR_HEIGHT + WEEK_GAP as u32 + WEEK_ELAPSED_HEIGHT,
-            BAR_HEIGHT
-        );
-        // The percentage is written at scale 2 and must still fit the shortened bar.
-        assert!(WEEK_BAR_HEIGHT >= (GLYPH_HEIGHT * 2) as u32);
+    fn still_counts_the_days_when_the_snapshot_is_gone() {
+        // The renewal panel is calendar arithmetic: a missing snapshot is no
+        // reason for it to show NO DATA.
+        let blank = usage::trouble_for_test();
+        let counted = draw(
+            Panel::Renewal,
+            &State {
+                usage: &blank,
+                cycle: Some(billing::cycle(20, 1_786_000_000.0)),
+            },
+        )
+        .unwrap();
+        let nothing = draw(Panel::Limits, &state(&blank)).unwrap();
+        assert_ne!(counted.hash(), nothing.hash());
     }
 }

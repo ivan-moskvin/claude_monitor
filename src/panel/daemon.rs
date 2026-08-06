@@ -10,7 +10,7 @@ use std::time::Duration;
 use divoomkit::{ClockFace, Device};
 
 use crate::i18n::t;
-use crate::panel::config::Config;
+use crate::panel::config::{Config, Screen};
 use crate::paths;
 
 const LOCK: &str = "divoom.pid";
@@ -125,21 +125,35 @@ pub fn stop() {
     let _ = std::fs::remove_file(path);
 }
 
-/// Gives the screen back its previous clock face from what the config
-/// remembers. Keeps quiet: during an uninstall the device may be switched off,
-/// and that is no reason to fail.
+/// Gives every screen we hold its previous clock face back, from what the
+/// config remembers. Keeps quiet: during an uninstall the device may be
+/// switched off, and that is no reason to fail.
 pub fn restore() {
     let Ok(config) = Config::load() else { return };
-    if config.ip.is_empty() || config.prev_clock_id == 0 {
+    restore_screens(&config, &config.screens);
+}
+
+/// The same for a named set of screens — the wizard hands over the ones it is
+/// about to give up, and those are gone from the config by then.
+pub fn restore_screens(config: &Config, screens: &[Screen]) {
+    if config.ip.is_empty() {
         return;
     }
     let Ok(ip) = config.ip.parse() else { return };
+    let device = Device::at(ip);
 
-    let face = ClockFace {
-        id: config.prev_clock_id,
-        independence: config.prev_independence,
-    };
-    let _ = Device::at(ip).set_clock_face(config.lcd_index, face);
+    for screen in screens {
+        if screen.prev_clock_id == 0 {
+            continue;
+        }
+        let _ = device.set_clock_face(
+            screen.index,
+            ClockFace {
+                id: screen.prev_clock_id,
+                independence: screen.prev_independence,
+            },
+        );
+    }
 }
 
 fn recorded_pid() -> Option<u32> {
